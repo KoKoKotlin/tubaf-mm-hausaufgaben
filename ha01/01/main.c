@@ -6,9 +6,11 @@
 
 #include "lib/bitmap.h"
 
-#define MAX(x, y) ((x < y) ? y : x)
-#define MIN(x, y) ((x > y) ? y : x)
+#define MAX(x, y) ((x < y) ? y : x) // getting the maximum of two intergers
+#define MIN(x, y) ((x > y) ? y : x) // getting the minimum of two intergers
 
+
+// manipulating the brightnes of a bitmap (HSV)
 void manipulate(bitmap_pixel_hsv_t* pixels, uint32_t width, uint32_t height, int offset)
 {
     for (uint32_t i = 0; i < width * height; i++) {
@@ -22,7 +24,7 @@ void manipulate(bitmap_pixel_hsv_t* pixels, uint32_t width, uint32_t height, int
         current_pixel->v = (bitmap_component_t)pixel_value_v;
     }
 }
-
+//reading, calling manipulate function and writing pixels back
 bitmap_error_t brighten_image(char* file_path, int offset) {
                     
 	// Read the bitmap pixels.
@@ -58,7 +60,7 @@ bitmap_error_t brighten_image(char* file_path, int offset) {
 		.colorSpace = BITMAP_COLOR_SPACE_HSV
 	};
 
-    // file_path + darker/brigther + offset
+    //Creating new file path using strncat() (file_path + darker/brigther + offset)
     char modified_file_path[256];
     strncpy(modified_file_path, file_path, strlen(file_path) - 4);
     strncat(modified_file_path, "_", 255);
@@ -86,7 +88,8 @@ bitmap_error_t brighten_image(char* file_path, int offset) {
 }
 
 int main(int argc, char** argv)
-{
+{   
+    //getting the arguments from terminal input
     int opt;
     char* offset_str;
     char* load_file_path;
@@ -101,6 +104,7 @@ int main(int argc, char** argv)
     
     int offset = atoi(offset_str);
 
+    //error handleing for offset error
     if (offset == 0) 
     {
         fprintf(stderr, "The offset was 0 or invalid! Exiting...");
@@ -111,6 +115,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    //error handleing for bitmap errors
     bitmap_error_t error;
     for (uint32_t index = optind; index < argc; index++) {
         load_file_path = argv[index];

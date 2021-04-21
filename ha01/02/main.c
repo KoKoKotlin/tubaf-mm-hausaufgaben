@@ -6,19 +6,20 @@
 
 #include "lib/bitmap.h"
 
-#define MAX(x, y) ((x < y) ? y : x)
-#define MIN(x, y) ((x > y) ? y : x)
+#define MAX(x, y) ((x < y) ? y : x) // getting the maximum of two intergers
+#define MIN(x, y) ((x > y) ? y : x) // getting the minimum of two intergers
 
+//alpha blending of two RGB bitmaps
 void manipulate(bitmap_pixel_rgb_t* pixels1, bitmap_pixel_rgb_t* pixels2, 
                  uint32_t width1, uint32_t height1, 
                  uint32_t width2, uint32_t height2, 
                  double alpha)
 {
-
+    //calculation borders for blending (diffrent size of bitmaps)
     uint32_t min_width = MIN(width1, width2);
     uint32_t min_height = MIN(height1, height2);
 
-    // index = y * w + x;
+    // blending pixels together
     for(uint32_t y = 0; y < min_height; y++) {
         for(uint32_t x = 0; x < min_width; x++) {
             uint32_t index1 = y * width1 + x;
@@ -34,7 +35,7 @@ void manipulate(bitmap_pixel_rgb_t* pixels1, bitmap_pixel_rgb_t* pixels2,
     }
 
 }
-
+//reading two bitmaps, calling alpha blending and writing back pixles
 bitmap_error_t alpha_blend(char* file_path1, char* file_path2, char* output_file_path, double alpha_blend) {
                     
 	// Read the bitmap pixels.
@@ -43,6 +44,7 @@ bitmap_error_t alpha_blend(char* file_path1, char* file_path2, char* output_file
 	bitmap_pixel_rgb_t* pixels1;
     bitmap_pixel_rgb_t* pixels2;
 
+    //error for bitmap #1
 	error1 = bitmapReadPixels(
 		file_path1,
 		(bitmap_pixel_t**)&pixels1,
@@ -50,7 +52,7 @@ bitmap_error_t alpha_blend(char* file_path1, char* file_path2, char* output_file
 		&height1,
 		BITMAP_COLOR_SPACE_RGB
 	);
-
+    //error for bitmap #2
     error2 = bitmapReadPixels(
 		file_path2,
 		(bitmap_pixel_t**)&pixels2,
@@ -58,16 +60,17 @@ bitmap_error_t alpha_blend(char* file_path1, char* file_path2, char* output_file
 		&height2,
 		BITMAP_COLOR_SPACE_RGB
 	);
-
+    //handleing bitmap reading errors
     if(error1 != BITMAP_ERROR_SUCCESS || error2 != BITMAP_ERROR_SUCCESS) {
 	    free(pixels1);
         free(pixels2);
         return (error1 != 0) ? error1 : error2;
     }
+    //calling alpha blendig
+    manipulate(pixels1, pixels2, width1, height1, width2, height2, alpha_blend);
+	
 
-	manipulate(pixels1, pixels2, width1, height1, width2, height2, alpha_blend);
-
-	// Write the pixels back.
+	// Write the pixels back. 
 	bitmap_parameters_t params =
 	{
 		.bottomUp = BITMAP_BOOL_TRUE,
@@ -78,7 +81,7 @@ bitmap_error_t alpha_blend(char* file_path1, char* file_path2, char* output_file
 		.dibHeaderFormat = BITMAP_DIB_HEADER_INFO,
 		.colorSpace = BITMAP_COLOR_SPACE_RGB
 	};
-
+    //error handleing for writing pixels
 	error1 = bitmapWritePixels(
 		output_file_path,
 		BITMAP_BOOL_TRUE,
@@ -93,7 +96,8 @@ bitmap_error_t alpha_blend(char* file_path1, char* file_path2, char* output_file
 }
 
 int main(int argc, char** argv)
-{
+{   
+    //getting arguments from terminal input
     int opt;
     char* alpha_blending_str = "0.5";
     char* new_file_path = "out.bmp";
@@ -110,13 +114,13 @@ int main(int argc, char** argv)
     }
     
     double alpha = atof(alpha_blending_str);
-
+    //error handleing for alpha input
     if (alpha < 0.0 || alpha > 1.0) 
     {
         fprintf(stderr, "The alpha was not in the valid range from 0.0 to 1.0! Exiting...");
         return 1;
     }
-
+    //error handleing for bitmap input
     bitmap_error_t error;
     char* bmp1 = NULL; 
     char* bmp2 = NULL;
@@ -131,7 +135,7 @@ int main(int argc, char** argv)
     }
 
     error = alpha_blend(bmp1, bmp2, new_file_path, alpha);
-
+    //error handleing for alpha blending
     switch(error) {
         case BITMAP_ERROR_INVALID_PATH:
             fprintf(stderr, "At least one file path is invalid!\n");
