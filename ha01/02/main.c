@@ -122,8 +122,8 @@ int main(int argc, char** argv)
 
     // error handling for bitmap input
     bitmap_error_t error;
-    char* bmp1 = NULL; 
-    char* bmp2 = NULL;
+    char *bmp1 = NULL;
+    char *bmp2 = NULL;
 
     // read in 2 files from the command line arguments
     for (uint32_t index = optind; index < argc; index++) {
