@@ -1,5 +1,5 @@
 # tubaf-mm-hausaufgaben
-Hausaufgaben der MM-Vorlesung von <strong>Christoph Pooch</strong>, <strong>Yannik Höll</strong>, <strong>Marie Clemenz</strong> und <strong>Viktoria <strong style="color: red;">Insert name here</strong></strong>
+Hausaufgaben der MM-Vorlesung von <strong>Christoph Pooch</strong>, <strong>Yannik Höll</strong>, <strong>Marie Clemenz</strong> und <strong>Viktoria Talaknianik</strong></strong>
 
 - [Hausaufgabe 1](https://github.com/KoKoKotlin/tubaf-mm-hausaufgaben/tree/main/ha01)
     - [Erster Teil](https://github.com/KoKoKotlin/tubaf-mm-hausaufgaben/tree/main/ha01/01) 
