@@ -37,59 +37,59 @@ void manipulate(bitmap_pixel_rgb_t *pixels1, bitmap_pixel_rgb_t *pixels2,
 // reading two bitmaps, calling alpha blending and writing back pixles
 bitmap_error_t alpha_blend(char *file_path1, char *file_path2, char *output_file_path, double alpha_blend)
 {
-	// read the bitmap pixels
-	bitmap_error_t error1, error2;
-	uint32_t width1, width2, height1, height2;
-	bitmap_pixel_rgb_t *pixels1;
+    // read the bitmap pixels
+    bitmap_error_t error1, error2;
+    uint32_t width1, width2, height1, height2;
+    bitmap_pixel_rgb_t *pixels1;
     bitmap_pixel_rgb_t *pixels2;
 
     // error for bitmap #1
-	error1 = bitmapReadPixels(
-		file_path1,
-		(bitmap_pixel_t**)&pixels1,
-		&width1,
-		&height1,
-		BITMAP_COLOR_SPACE_RGB
-	);
+    error1 = bitmapReadPixels(
+        file_path1,
+        (bitmap_pixel_t**)&pixels1,
+        &width1,
+        &height1,
+        BITMAP_COLOR_SPACE_RGB
+    );
 
     // error for bitmap #2
     error2 = bitmapReadPixels(
-		file_path2,
-		(bitmap_pixel_t**)&pixels2,
-		&width2,
-		&height2,
-		BITMAP_COLOR_SPACE_RGB
-	);
+        file_path2,
+        (bitmap_pixel_t**)&pixels2,
+        &width2,
+        &height2,
+        BITMAP_COLOR_SPACE_RGB
+    );
 
     // handling bitmap reading errors
     if (error1 != BITMAP_ERROR_SUCCESS || error2 != BITMAP_ERROR_SUCCESS) goto free_res;
 
     // calling alpha blendig
     manipulate(pixels1, pixels2, width1, height1, width2, height2, alpha_blend);
-	
-	// write the pixels back
-	bitmap_parameters_t params =
-	{
-		.bottomUp = BITMAP_BOOL_TRUE,
-		.widthPx = width1,
-		.heightPx = height1,
-		.colorDepth = BITMAP_COLOR_DEPTH_24,
-		.compression = BITMAP_COMPRESSION_NONE,
-		.dibHeaderFormat = BITMAP_DIB_HEADER_INFO,
-		.colorSpace = BITMAP_COLOR_SPACE_RGB
-	};
+
+    // write the pixels back
+    bitmap_parameters_t params =
+    {
+        .bottomUp = BITMAP_BOOL_TRUE,
+        .widthPx = width1,
+        .heightPx = height1,
+        .colorDepth = BITMAP_COLOR_DEPTH_24,
+        .compression = BITMAP_COMPRESSION_NONE,
+        .dibHeaderFormat = BITMAP_DIB_HEADER_INFO,
+        .colorSpace = BITMAP_COLOR_SPACE_RGB
+    };
 
     // error handling for writing pixels
-	error1 = bitmapWritePixels(
-		output_file_path,
-		BITMAP_BOOL_TRUE,
-		&params,
-		(bitmap_pixel_t*)pixels1
-	);
+    error1 = bitmapWritePixels(
+        output_file_path,
+        BITMAP_BOOL_TRUE,
+        &params,
+        (bitmap_pixel_t*)pixels1
+    );
 
 free_res:
-	// free the memory that has been allocated by the bitmap library
-	free(pixels1);
+    // free the memory that has been allocated by the bitmap library
+    free(pixels1);
     free(pixels2);
     return (error1 != 0) ? error1 : error2;;
 }
@@ -158,5 +158,5 @@ int main(int argc, char** argv)
             break;
     }
     
-	return 0;
+    return 0;
 }
