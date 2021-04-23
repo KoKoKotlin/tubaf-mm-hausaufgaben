@@ -94,6 +94,15 @@ free_res:
     return (error1 != 0) ? error1 : error2;;
 }
 
+void print_help()
+{
+    printf("Usage: ./alpha_blender.out fileName1 fileName2 [-a alpha] [-o outFileName]\n"
+           "The specified 2 files should be bitmap files. If more than 2 files are specified than the first and the last one are blended!\n"
+           "-a changes the alpha value used for blending and should be between 0.0 and 1.0 [default: 0.5]\n"
+           "-o sets the name of the output file [default: out.bmp]\n"
+           );
+}
+
 int main(int argc, char** argv)
 {   
     // getting arguments from terminal input
@@ -109,6 +118,11 @@ int main(int argc, char** argv)
             case 'o':
                 new_file_path = optarg;
                 break;
+            // triggered on unrecognized option
+            case '?':
+                fprintf(stderr, "Unrecognized option -%c!\n", optopt);
+                print_help();
+                return -1;
         }
     }
 
@@ -116,7 +130,8 @@ int main(int argc, char** argv)
 
     // error handling for alpha input
     if (alpha < 0.0 || alpha > 1.0) {
-        fprintf(stderr, "The alpha was not in the valid range from 0.0 to 1.0! Exiting...");
+        fprintf(stderr, "The alpha was not in the valid range from 0.0 to 1.0! Exiting...\n");
+        print_help();
         return 1;
     }
 
@@ -133,7 +148,8 @@ int main(int argc, char** argv)
 
     // error detection if 2 files were given
     if (bmp1 == NULL || bmp2 == NULL) {
-        fprintf(stderr, "The program needs 2 file paths as input!");
+        fprintf(stderr, "The program needs 2 file paths as input!\n");
+        print_help();
         return 1;
     }
 
