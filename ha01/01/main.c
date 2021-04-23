@@ -92,6 +92,13 @@ free_res:
     return error;
 }
 
+void print_help()
+{
+    printf("Usage: ./brightness_changer.out fileName1 [fileName2 ... fileNameN] -b brightness_offset\n"
+           "The specified files should be bitmap files and the brightness_offset must be specified and should be in the range from -100 to 100 and not be equal to 0!\n"
+           "The output of the program are bitmap files with the original name and additional information that shows how they were altered.\n");
+}
+
 int main(int argc, char **argv)
 {
     // getting the arguments from terminal input
@@ -104,6 +111,11 @@ int main(int argc, char **argv)
             case 'b':
                 offset_str = optarg;
                 break;
+            // triggered on unrecognized option
+            case '?':
+                fprintf(stderr, "Unrecognized option -%c!\n", optopt);
+                print_help();
+                return -1;
         }
     }
 
@@ -111,10 +123,11 @@ int main(int argc, char **argv)
 
     // error handling for offset error
     if (offset == 0) {
-        fprintf(stderr, "The offset was 0 or invalid! Exiting...");
+        fprintf(stderr, "The offset was 0 or invalid! Exiting...\n\n");
+        print_help();
         return 1;
     } else if (offset < -100 || offset > 100) {
-        fprintf(stderr, "The offset was not in the valid range from -100 to 100! Exiting...");
+        fprintf(stderr, "The offset was not in the valid range from -100 to 100! Exiting...\n");
         return 1;
     }
 
