@@ -98,7 +98,7 @@ bitmap_error_t alpha_blend(char *file_path1, char *file_path2, char *output_file
     // free the memory that has been allocated by the bitmap library
     free(pixels1);
     free(pixels2);
-    return (error1 != 0) ? error1 : error2;;
+    return error1;
 }
 
 void print_help()
