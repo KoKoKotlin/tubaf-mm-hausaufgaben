@@ -62,7 +62,15 @@ bitmap_error_t alpha_blend(char *file_path1, char *file_path2, char *output_file
     );
 
     // handling bitmap reading errors
-    if (error1 != BITMAP_ERROR_SUCCESS || error2 != BITMAP_ERROR_SUCCESS) goto free_res;
+    // the pixel data is freed in the lib code on error
+    if (error1 != BITMAP_ERROR_SUCCESS || error2 != BITMAP_ERROR_SUCCESS) {
+
+        // free the data if one read succeeded
+        if(error1 == BITMAP_ERROR_SUCCESS) free(pixels1);
+        if(error2 == BITMAP_ERROR_SUCCESS) free(pixels2);
+
+        return (error1 != BITMAP_ERROR_SUCCESS) ? error1 : error2;
+    }
 
     // calling alpha blendig
     manipulate(pixels1, pixels2, width1, height1, width2, height2, alpha_blend);
@@ -87,7 +95,6 @@ bitmap_error_t alpha_blend(char *file_path1, char *file_path2, char *output_file
         (bitmap_pixel_t*)pixels1
     );
 
-free_res:
     // free the memory that has been allocated by the bitmap library
     free(pixels1);
     free(pixels2);

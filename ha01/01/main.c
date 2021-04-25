@@ -58,7 +58,8 @@ bitmap_error_t brighten_image(char *file_path, int offset)
     );
 
     // if the bitmap read returns an error, skip the manipulation of the image
-    if (error != BITMAP_ERROR_SUCCESS) goto free_res;
+    // the buffer is freed in the lib code
+    if (error != BITMAP_ERROR_SUCCESS) return error;
 
     // manipulate the pixels
     manipulate(pixels, width, height, offset);
@@ -86,7 +87,6 @@ bitmap_error_t brighten_image(char *file_path, int offset)
         (bitmap_pixel_t*)pixels
     );
 
-free_res:
     // free the memory that has been allocated by the bitmap library
     free(pixels);
     return error;
