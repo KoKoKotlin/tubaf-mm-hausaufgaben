@@ -157,8 +157,7 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
                 z_real = _mm_add_ps(z_real, _mm_mul_ps(new_z_real_diff, bounded));
                 z_imag = _mm_add_ps(z_imag, _mm_mul_ps(new_z_imag_diff, bounded));
 
-                mk += 1.0f;
-                
+
                 z_real_2 = _mm_mul_ps(z_real, z_real);
                 z_imag_2 = _mm_mul_ps(z_imag, z_imag);
                 
