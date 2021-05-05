@@ -124,7 +124,7 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
 
             __m128 xs = load_array(xarr);
             __m128 ys = _mm_set1_ps(y);
-            
+
             __m128 real_part = coordinate_transformation(xs, xdiff_sse, width_sse,  xlim_sse);
             __m128 imag_part = coordinate_transformation(ys, ydiff_sse, height_sse, ylim_sse);
             
@@ -139,13 +139,16 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
             __m128 mks = _mm_set1_ps(0.0f);
 
             while (++mk < s->iterations) {
-                //z_n+1 = z_n² + c
+                // z_n+1 = z_n² + c = (a + bi)^2 + c
+                // Re(z_n+1) = a^2 - b^2 + cr
+                // Im(z_n+1) = 2 * a * b + ci
+
                 __m128 z_real_2 = _mm_mul_ps(z_real, z_real);
                 __m128 z_imag_2 = _mm_mul_ps(z_imag, z_imag);
                 __m128 z_mixed  = _mm_mul_ps(z_imag, z_real);
                 
-                __m128 new_z_real = _mm_add_ps(_mm_sub_ps(z_real_2, z_imag_2), z_real);
-                __m128 new_z_imag = _mm_add_ps(_mm_add_ps(z_mixed, z_mixed), z_imag);
+                __m128 new_z_real = _mm_add_ps(_mm_sub_ps(z_real_2, z_imag_2), real_part);
+                __m128 new_z_imag = _mm_add_ps(_mm_add_ps(z_mixed, z_mixed), imag_part);
                 
                 __m128 new_z_real_diff = _mm_sub_ps(new_z_real, z_real);
                 __m128 new_z_imag_diff = _mm_sub_ps(new_z_imag, z_imag);
