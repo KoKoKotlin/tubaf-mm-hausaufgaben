@@ -135,7 +135,7 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
             __m128 bounded = ones;
 
             //iteration steps
-            float mk = 0.0f;
+            size_t mk = 0;
             __m128 mks = _mm_set1_ps(0.0f);
 
             while (++mk < s->iterations) {
