@@ -75,18 +75,18 @@ void mandel_basic(bitmap_pixel_rgb_t *image, const struct MandelSpec *s){
     }
 }
 
-__m128 load_array(float* arr)
+inline static __m128 load_array(float* arr)
 {
     __m128 v_sse = _mm_loadu_ps(arr);    
     return v_sse;
 }
 
-size_t make_div_by_four(size_t s) 
+inline static size_t make_div_by_four(size_t s)
 {
     return s % 4 == 0 ? s : s + (4 - s % 4);
 }
 
-__m128 coordinate_transformation(__m128 coords, __m128 diff, __m128 range, __m128 lim) {
+inline static __m128 coordinate_transformation(__m128 coords, __m128 diff, __m128 range, __m128 lim) {
     __m128 scaled_coords = _mm_mul_ps(coords, diff);
     __m128 normalized_coords = _mm_div_ps(scaled_coords, range);
     return _mm_add_ps(normalized_coords, lim);
@@ -116,6 +116,9 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
     __m128 height_sse = _mm_set1_ps((float)s->height);
     __m128 ones       = _mm_set1_ps(1.0f);
     __m128 fours      = _mm_set1_ps(4.0f);
+
+    float *out_buffer = NULL;
+    posix_memalign((void**)&out_buffer, 16, sizeof(float) * make_div_by_four(s->width) * s->height);
 
     //iterate over all pixels in the image
     for(float y = 0; y < s->height; y++) {
@@ -183,19 +186,19 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
             //scale up with color depth of image
             mks = _mm_mul_ps(mks, depth_scale_sse);
 
-            float pixelValues[4];
-            _mm_storeu_ps(pixelValues, mks);
-
-            for (size_t i = 0; i < 4; i++) {
-                if (x * 4 + i >= s->width) break;
-                
-                image[(size_t)y * s->width + (size_t)x * 4 + i].r = (uint8_t)pixelValues[i];
-                image[(size_t)y * s->width + (size_t)x * 4 + i].g = (uint8_t)pixelValues[i];
-                image[(size_t)y * s->width + (size_t)x * 4 + i].b = (uint8_t)pixelValues[i];
-            }
+            _mm_store_ps(out_buffer + (size_t)y * s->width + (size_t)x * 4, mks);
         }
     }
 
+    for(size_t y = 0; y < s->height; y++) {
+        for (size_t x = 0; x < s->width; x++) {
+            image[y * s->width + x].r = (uint8_t)out_buffer[y * s->width + x];
+            image[y * s->width + x].g = (uint8_t)out_buffer[y * s->width + x];
+            image[y * s->width + x].b = (uint8_t)out_buffer[y * s->width + x];
+        }
+    }
+
+    free(out_buffer);
 }
 
 int main(int argc, char *argv[]){
