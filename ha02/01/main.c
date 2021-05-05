@@ -23,17 +23,9 @@ void manipulate(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height, flo
         else                brightness_buffer[i] = 0.0f;
     
     
-    float *temp_buff = NULL;
-    posix_memalign((void**)&temp_buff, 16, sizeof(float) * 4);    
-    for(size_t i = 0; i < 4; i++) temp_buff[i] = 255.0f;
-    __m128 v_max = _mm_load_ps(temp_buff);
-    free(temp_buff);
-
-    posix_memalign((void**)&temp_buff, 16, sizeof(float) * 4);    
-    for(size_t i = 0; i < 4; i++) temp_buff[i] = brighten_rate;
-    __m128 brightness_rate_sse = _mm_load_ps(temp_buff);
-    free(temp_buff);
-
+    __m128 v_max = _mm_set1_ps(255.0f);
+    __m128 brightness_rate_sse = _mm_set1_ps(brighten_rate);
+    
     // new_v_c = v_c + delta * brighten_rate;
     for (size_t i = 0; i < buffer_size / 4; i++) {
         __m128 current = _mm_load_ps(brightness_buffer + i * 4);

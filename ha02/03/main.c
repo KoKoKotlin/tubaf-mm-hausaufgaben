@@ -75,10 +75,129 @@ void mandel_basic(bitmap_pixel_rgb_t *image, const struct MandelSpec *s){
     }
 }
 
-
-void mandel_sse2(bitmap_pixel_t *image, const struct MandelSpec *s)
+__m128 load_array(float* arr)
 {
-   // TODO:
+    __m128 v_sse = _mm_loadu_ps(arr);    
+    return v_sse;
+}
+
+size_t make_div_by_four(size_t s) 
+{
+    return s % 4 == 0 ? s : s + (4 - s % 4);
+}
+
+__m128 coordinate_transformation(__m128 coords, __m128 diff, __m128 range, __m128 lim) {
+    __m128 scaled_coords = _mm_mul_ps(coords, diff);
+    __m128 normalized_coords = _mm_div_ps(scaled_coords, range);
+    return _mm_add_ps(normalized_coords, lim);
+}
+
+void print_mm(__m128 m) {
+    float temp[4];
+    _mm_storeu_ps(temp, m);
+
+    for(size_t i = 0; i < 4; i++) printf("%f ", temp[i]);
+    printf(" ");
+}
+
+void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
+{   
+    float xdiff = s->xlim[1] - s->xlim[0];
+    float ydiff = s->ylim[1] - s->ylim[0];
+
+    float iter_scale = 1.0f / s->iterations;
+    float depth_scale = s->depth - 1;
+
+    __m128 xdiff_sse  = _mm_set1_ps(xdiff);
+    __m128 ydiff_sse  = _mm_set1_ps(ydiff);
+    __m128 xlim_sse   = _mm_set1_ps(s->xlim[0]);
+    __m128 ylim_sse   = _mm_set1_ps(s->ylim[0]);
+    __m128 width_sse  = _mm_set1_ps((float)s->width);
+    __m128 height_sse = _mm_set1_ps((float)s->height);
+    __m128 ones       = _mm_set1_ps(1.0f);
+    __m128 fours      = _mm_set1_ps(4.0f);
+
+    //iterate over all pixels in the image
+    for(float y = 0; y < s->height; y++) {
+        for(float x = 0; x < make_div_by_four(s->width) / 4; x++) {
+            float xarr[] = { x * 4, x * 4 + 1, x * 4 + 2, x * 4 + 3 };
+
+            __m128 xs = load_array(xarr);
+            __m128 ys = _mm_set1_ps(y);
+            
+            __m128 real_part = coordinate_transformation(xs, xdiff_sse, width_sse,  xlim_sse);
+            __m128 imag_part = coordinate_transformation(ys, ydiff_sse, height_sse, ylim_sse);
+            
+            //this will be z_n, here the initial term z0
+            __m128 z_real = real_part;
+            __m128 z_imag = imag_part;
+
+            __m128 bounded = ones;
+
+            //iteration steps
+            float mk = 0.0f;
+            __m128 mks = _mm_set1_ps(0.0f);
+
+            while (++mk < s->iterations) {
+                //z_n+1 = z_n² + c
+                __m128 z_real_2 = _mm_mul_ps(z_real, z_real);
+                __m128 z_imag_2 = _mm_mul_ps(z_imag, z_imag);
+                __m128 z_mixed  = _mm_mul_ps(z_imag, z_real);
+                
+                __m128 new_z_real = _mm_add_ps(_mm_sub_ps(z_real_2, z_imag_2), z_real);
+                __m128 new_z_imag = _mm_add_ps(_mm_add_ps(z_mixed, z_mixed), z_imag);
+                
+                __m128 new_z_real_diff = _mm_sub_ps(new_z_real, z_real);
+                __m128 new_z_imag_diff = _mm_sub_ps(new_z_imag, z_imag);
+                
+                //save z_n+1
+                z_real = _mm_add_ps(z_real, _mm_mul_ps(new_z_real_diff, bounded));
+                z_imag = _mm_add_ps(z_imag, _mm_mul_ps(new_z_imag_diff, bounded));
+
+                mk += 1.0f;
+                
+                z_real_2 = _mm_mul_ps(z_real, z_real);
+                z_imag_2 = _mm_mul_ps(z_imag, z_imag);
+                
+                //bounded and therefore part of the mandelbrot set, if |z_n+1| > 2
+                __m128 z_abs = _mm_add_ps(z_real_2, z_imag_2);
+                bounded = _mm_and_ps(_mm_cmplt_ps(z_abs, fours), ones);
+
+#ifdef DEBUG
+                print_mm(bounded);
+                printf("\n");
+                print_mm(z_abs);
+#endif
+
+                mks = _mm_add_ps(mks, bounded);
+            }
+
+            __m128 iter_scale_sse  = _mm_set1_ps(iter_scale);
+            __m128 depth_scale_sse = _mm_set1_ps(depth_scale);
+
+            //mk is between 0 and s->iterations
+            //scale it to fit between 0 and 1
+            mks = _mm_mul_ps(mks, iter_scale_sse);
+
+            //damping for nicer color gradients
+            mks = _mm_sqrt_ps(mks);
+
+            //scale up with color depth of image
+            mks = _mm_mul_ps(mks, depth_scale_sse);
+
+            float pixelValues[4];
+            _mm_storeu_ps(pixelValues, mks);
+
+            for (size_t i = 0; i < 4; i++) {
+                if (x * 4 + i >= s->width) break;
+                
+                image[(size_t)y * s->width + (size_t)x * 4 + i].r = (uint8_t)pixelValues[i];
+                image[(size_t)y * s->width + (size_t)x * 4 + i].g = (uint8_t)pixelValues[i];
+                image[(size_t)y * s->width + (size_t)x * 4 + i].b = (uint8_t)pixelValues[i];
+            }
+        }
+    }
+
 }
 
 int main(int argc, char *argv[]){
@@ -134,8 +253,11 @@ int main(int argc, char *argv[]){
 
     bitmap_pixel_t *image = malloc(spec.width * spec.height * sizeof(bitmap_pixel_t));
 
-    // TODO: switch with mandel_sse2!
+#ifdef NORMAL
     mandel_basic((bitmap_pixel_rgb_t*)image, &spec);
+#else
+    mandel_sse2((bitmap_pixel_rgb_t*)image, &spec);
+#endif
 
     bitmap_parameters_t params;
     memset(&params, 0, sizeof(bitmap_parameters_t));

@@ -5,6 +5,14 @@ FLAGS = -Wall -lm
 OBJECTS = main.o lib/bitmap.o
 TARGET = mandel.out
 
+all: $(TARGET)
+
+debug: FLAGS += -DDEBUG -g
+debug: $(TARGET)
+
+normal: FLAGS += -DNORMAL
+normal: $(TARGET)
+
 $(TARGET) : $(OBJECTS)
 	$(CC) -o $(TARGET) $(OBJECTS) $(FLAGS)
 
