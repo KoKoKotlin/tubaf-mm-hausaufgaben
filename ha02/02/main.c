@@ -3,127 +3,206 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <pmmintrin.h>
+#include <immintrin.h>
 
 #include "lib/bitmap.h"
 
-#define MIN(x, y) ((x > y) ? y : x)
-
-// alpha blending of two RGB bitmaps
-void manipulate(bitmap_pixel_rgb_t *pixels1, bitmap_pixel_rgb_t *pixels2,
-                uint32_t width1, uint32_t height1,
-                uint32_t width2, uint32_t height2,
-                double alpha)
+uint32_t supports_avx2() 
 {
-    // calculation borders for blending (diffrent size of bitmaps)
-    uint32_t min_width = MIN(width1, width2);
-    uint32_t min_height = MIN(height1, height2);
+    uint32_t rax, rbx, rcx, rdx;
 
-    // blending pixels together
-    for (uint32_t y = 0; y < min_height; y++) {
-        for (uint32_t x = 0; x < min_width; x++) {
-            uint32_t index1 = y * width1 + x;
-            uint32_t index2 = y * width2 + x;
-
-            bitmap_pixel_rgb_t *pixel1 = &pixels1[index1];
-            bitmap_pixel_rgb_t *pixel2 = &pixels2[index2];
-            
-            pixel1->r = (pixel1->r * alpha + (1 - alpha) * pixel2->r);
-            pixel1->g = (pixel1->g * alpha + (1 - alpha) * pixel2->g);
-            pixel1->b = (pixel1->b * alpha + (1 - alpha) * pixel2->b);
-        }
-    }
+    __asm__ __volatile__ (
+        ".intel_syntax noprefix \n"
+        "mov rax, 7             \n"
+        "mov rcx, 0             \n"
+        "cpuid                  \n"
+        ".att_syntax prefix     \n"
+        :"=a"(rax), "=b"(rbx), "=c"(rcx), "=d"(rdx)
+    );
+    
+    return rbx >> 5 & 1;
 }
 
-// reading two bitmaps, calling alpha blending and writing back pixles
-bitmap_error_t alpha_blend(char *file_path1, char *file_path2, char *output_file_path, double alpha_blend)
+// manipulating the brightnes of a bitmap (HSV)
+void manipulate_avx2(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height, float brighten_rate)
+{
+    float *brightness_buffer = NULL;
+    
+    uint32_t pixel_count = width * height;
+    uint32_t buffer_size = (pixel_count) % 4 == 0 ? pixel_count : pixel_count + (4 - pixel_count % 4);
+
+    posix_memalign((void**)&brightness_buffer, 16, sizeof(float) * buffer_size);
+    
+    for(size_t i = 0; i < buffer_size; i++)
+        if(i < pixel_count) brightness_buffer[i] = (float)pixels[i].v;
+        else                brightness_buffer[i] = 0.0f;
+    
+    
+    float *temp_buff = NULL;
+    posix_memalign((void**)&temp_buff, 16, sizeof(float) * 4);    
+    for(size_t i = 0; i < 4; i++) temp_buff[i] = 255.0f;
+    __m128 v_max = _mm_load_ps(temp_buff);
+    free(temp_buff);
+
+    posix_memalign((void**)&temp_buff, 16, sizeof(float) * 4);    
+    for(size_t i = 0; i < 4; i++) temp_buff[i] = brighten_rate;
+    __m128 brightness_rate_sse = _mm_load_ps(temp_buff);
+    free(temp_buff);
+
+    // new_v_c = v_c + delta * brighten_rate;
+    for (size_t i = 0; i < buffer_size / 4; i++) {
+        __m128 current = _mm_load_ps(brightness_buffer + i * 4);
+        
+        __m128 delta;
+        if (brighten_rate < 0) delta = current;
+        else                   delta = _mm_sub_ps(v_max, current);
+        
+        current = _mm_fmadd_ps(delta, brightness_rate_sse, current);
+
+        _mm_store_ps(brightness_buffer + 4 * i, current);
+    }
+    
+    for(size_t i = 0; i < buffer_size; i++)
+        pixels[i].v = (bitmap_component_t)brightness_buffer[i];
+        
+    free(brightness_buffer);
+}
+
+// manipulating the brightnes of a bitmap (HSV)
+void manipulate_see(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height, float brighten_rate)
+{
+    float *brightness_buffer = NULL;
+    
+    uint32_t pixel_count = width * height;
+    uint32_t buffer_size = (pixel_count) % 4 == 0 ? pixel_count : pixel_count + (4 - pixel_count % 4);
+
+    posix_memalign((void**)&brightness_buffer, 16, sizeof(float) * buffer_size);
+    
+    for(size_t i = 0; i < buffer_size; i++)
+        if(i < pixel_count) brightness_buffer[i] = (float)pixels[i].v;
+        else                brightness_buffer[i] = 0.0f;
+    
+    
+    float *temp_buff = NULL;
+    posix_memalign((void**)&temp_buff, 16, sizeof(float) * 4);    
+    for(size_t i = 0; i < 4; i++) temp_buff[i] = 255.0f;
+    __m128 v_max = _mm_load_ps(temp_buff);
+    free(temp_buff);
+
+    posix_memalign((void**)&temp_buff, 16, sizeof(float) * 4);    
+    for(size_t i = 0; i < 4; i++) temp_buff[i] = brighten_rate;
+    __m128 brightness_rate_sse = _mm_load_ps(temp_buff);
+    free(temp_buff);
+
+    // new_v_c = v_c + delta * brighten_rate;
+    for (size_t i = 0; i < buffer_size / 4; i++) {
+        __m128 current = _mm_load_ps(brightness_buffer + i * 4);
+        
+        __m128 delta;
+        if (brighten_rate < 0) delta = current;
+        else                   delta = _mm_sub_ps(v_max, current);
+        
+        __m128 weigthed_delta = _mm_mul_ps(delta, brightness_rate_sse);
+        current = _mm_add_ps(weigthed_delta, current);
+
+        _mm_store_ps(brightness_buffer + 4 * i, current);
+    }
+    
+    for(size_t i = 0; i < buffer_size; i++)
+        pixels[i].v = (bitmap_component_t)brightness_buffer[i];
+        
+    free(brightness_buffer);
+}
+
+// creating new file path using strncat() (file_path + darker/brigther + offset)
+void create_new_filename(char *old_file_path, float brighten_rate, char *modified_file_path)
+{
+    strncpy(modified_file_path, old_file_path, strlen(old_file_path) - 4);
+    strncat(modified_file_path, "_", 255);
+
+    if (brighten_rate >= 0) strncat(modified_file_path, "brighter", 255);
+    else                    strncat(modified_file_path, "darker", 255);
+    strncat(modified_file_path, "_", 255);
+
+    char offset_buffer[6];
+    memset(offset_buffer, 0, 6);
+    sprintf(offset_buffer, "%.2f", fabs(brighten_rate));
+    strncat(modified_file_path, offset_buffer, 255);
+
+    strncat(modified_file_path, ".bmp", 255);
+}
+ 
+// reading, calling manipulate function and writing pixels back
+bitmap_error_t brighten_image(char *file_path, float brighten_rate)
 {
     // read the bitmap pixels
-    bitmap_error_t error1, error2;
-    uint32_t width1, width2, height1, height2;
-    bitmap_pixel_rgb_t *pixels1;
-    bitmap_pixel_rgb_t *pixels2;
+    bitmap_error_t error;
+    uint32_t width, height;
+    bitmap_pixel_hsv_t *pixels;
 
-    // error for bitmap #1
-    error1 = bitmapReadPixels(
-        file_path1,
-        (bitmap_pixel_t**)&pixels1,
-        &width1,
-        &height1,
-        BITMAP_COLOR_SPACE_RGB
+    error = bitmapReadPixels(
+        file_path,
+        (bitmap_pixel_t**)&pixels,
+        &width,
+        &height,
+        BITMAP_COLOR_SPACE_HSV
     );
 
-    // error for bitmap #2
-    error2 = bitmapReadPixels(
-        file_path2,
-        (bitmap_pixel_t**)&pixels2,
-        &width2,
-        &height2,
-        BITMAP_COLOR_SPACE_RGB
-    );
+    // if the bitmap read returns an error, skip the manipulation of the image
+    // the buffer is freed in the lib code
+    if (error != BITMAP_ERROR_SUCCESS) return error;
 
-    // handling bitmap reading errors
-    // the pixel data is freed in the lib code on error
-    if (error1 != BITMAP_ERROR_SUCCESS || error2 != BITMAP_ERROR_SUCCESS) {
+    // check for avx2 support and manipulate the pixels
+    if (supports_avx2()) manipulate_avx2(pixels, width, height, brighten_rate);
+    else                 manipulate_see(pixels, width, height, brighten_rate);
 
-        // free the data if one read succeeded
-        if(error1 == BITMAP_ERROR_SUCCESS) free(pixels1);
-        if(error2 == BITMAP_ERROR_SUCCESS) free(pixels2);
+    // get the new filename
+    char modified_file_path[256];
+    create_new_filename(file_path, brighten_rate, modified_file_path);
 
-        return (error1 != BITMAP_ERROR_SUCCESS) ? error1 : error2;
-    }
-
-    // calling alpha blendig
-    manipulate(pixels1, pixels2, width1, height1, width2, height2, alpha_blend);
-
-    // write the pixels back
-    bitmap_parameters_t params =
-    {
+    // parameters of the written image
+    bitmap_parameters_t params = {
         .bottomUp = BITMAP_BOOL_TRUE,
-        .widthPx = width1,
-        .heightPx = height1,
+        .widthPx = width,
+        .heightPx = height,
         .colorDepth = BITMAP_COLOR_DEPTH_24,
         .compression = BITMAP_COMPRESSION_NONE,
         .dibHeaderFormat = BITMAP_DIB_HEADER_INFO,
-        .colorSpace = BITMAP_COLOR_SPACE_RGB
+        .colorSpace = BITMAP_COLOR_SPACE_HSV
     };
 
-    // error handling for writing pixels
-    error1 = bitmapWritePixels(
-        output_file_path,
+    // write the pixels back
+    error = bitmapWritePixels(
+        modified_file_path,
         BITMAP_BOOL_TRUE,
         &params,
-        (bitmap_pixel_t*)pixels1
+        (bitmap_pixel_t*)pixels
     );
 
     // free the memory that has been allocated by the bitmap library
-    free(pixels1);
-    free(pixels2);
-    return error1;
+    free(pixels);
+    return error;
 }
 
 void print_help()
 {
-    printf("Usage: ./alpha_blender.out fileName1 fileName2 [-a alpha] [-o outFileName]\n"
-           "The specified 2 files should be bitmap files. If more than 2 files are specified than the first and the last one are blended!\n"
-           "-a changes the alpha value used for blending and should be between 0.0 and 1.0 [default: 0.5]\n"
-           "-o sets the name of the output file [default: out.bmp]\n"
-           );
+    printf("Usage: ./brightness_changer.out fileName1 [fileName2 ... fileNameN] -b brightness_offset\n"
+           "The specified files should be bitmap files and the brightness_offset must be specified and should be in the range from -100 to 100 and not be equal to 0!\n"
+           "The output of the program are bitmap files with the original name and additional information that shows how they were altered.\n");
 }
 
-int main(int argc, char** argv)
-{   
-    // getting arguments from terminal input
+int main(int argc, char **argv)
+{
+    // getting the arguments from terminal input
     int opt;
-    char *alpha_blending_str = "0.5";
-    char *new_file_path = "out.bmp";
+    char *brighten_string;
+    char *load_file_path;
 
-    while ((opt = getopt(argc, argv, "a:o:")) != -1) {
+    while ((opt = getopt(argc, argv, "b:")) != -1) {
         switch (opt) {
-            case 'a':
-                alpha_blending_str = optarg; 
-                break;
-            case 'o':
-                new_file_path = optarg;
+            case 'b':
+                brighten_string = optarg;
                 break;
             // triggered on unrecognized option
             case '?':
@@ -133,53 +212,39 @@ int main(int argc, char** argv)
         }
     }
 
-    double alpha = atof(alpha_blending_str);
+    float brighten_rate = (float)atof(brighten_string);
 
-    // error handling for alpha input
-    if (alpha < 0.0 || alpha > 1.0) {
-        fprintf(stderr, "The alpha was not in the valid range from 0.0 to 1.0! Exiting...\n");
-        print_help();
+    // error handling for offset error
+    if (brighten_rate < -1.0f || brighten_rate > 1.0f) {
+        fprintf(stderr, "The offset was not in the valid range from -1 to 1! Exiting...\n");
         return 1;
     }
 
-    // error handling for bitmap input
+    // error handling for bitmap errors
     bitmap_error_t error;
-    char *bmp1 = NULL;
-    char *bmp2 = NULL;
-
-    // read in 2 files from the command line arguments
     for (uint32_t index = optind; index < argc; index++) {
-        if(bmp1 == NULL) bmp1 = argv[index];
-        else             bmp2 = argv[index];
+        load_file_path = argv[index];
+
+        error = brighten_image(load_file_path, brighten_rate);
+
+        switch (error) {
+            case BITMAP_ERROR_INVALID_PATH:
+                fprintf(stderr, "The file path (%s) does not exist.\n", load_file_path);
+                break;
+            case BITMAP_ERROR_INVALID_FILE_FORMAT:
+                fprintf(stderr, "The file (%s) is not in the right format.\n", load_file_path);
+                break;
+            case BITMAP_ERROR_IO:
+                fprintf(stderr, "Error while reading file (%s).\n", load_file_path);
+                break;
+            case BITMAP_ERROR_MEMORY:
+                fprintf(stderr, "Error while writing file.\n");
+                break;
+            case BITMAP_ERROR_FILE_EXISTS:
+                fprintf(stderr, "Error: File does already exist.\n");
+                break;
+        }
     }
 
-    // error detection if 2 files were given
-    if (bmp1 == NULL || bmp2 == NULL) {
-        fprintf(stderr, "The program needs 2 file paths as input!\n");
-        print_help();
-        return 1;
-    }
-
-    error = alpha_blend(bmp1, bmp2, new_file_path, alpha);
-
-    // error handling for alpha blending
-    switch (error) {
-        case BITMAP_ERROR_INVALID_PATH:
-            fprintf(stderr, "At least one file path is invalid!\n");
-            break;
-        case BITMAP_ERROR_INVALID_FILE_FORMAT:
-            fprintf(stderr, "At least one file is not in the right file format!\n");
-            break;
-        case BITMAP_ERROR_IO:
-            fprintf(stderr, "Error while reading at least one file.\n");
-            break;
-        case BITMAP_ERROR_MEMORY:
-            fprintf(stderr, "Error while writing file.\n");
-            break;
-        case BITMAP_ERROR_FILE_EXISTS:
-            fprintf(stderr, "Error: File does already exist.\n");
-            break;
-    }
-    
     return 0;
 }

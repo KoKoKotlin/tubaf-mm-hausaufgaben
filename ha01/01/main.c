@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "lib/bitmap.h"
 
@@ -61,8 +62,11 @@ bitmap_error_t brighten_image(char *file_path, int offset)
     // the buffer is freed in the lib code
     if (error != BITMAP_ERROR_SUCCESS) return error;
 
+    clock_t start = clock();
     // manipulate the pixels
     manipulate(pixels, width, height, offset);
+    printf("C Loop Multiplication: %.6fms\n", (double)(clock() - start) / (CLOCKS_PER_SEC / 1000));
+
 
     // get the new filename
     char modified_file_path[256];

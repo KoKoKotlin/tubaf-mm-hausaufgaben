@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 CC = gcc
-FLAGS = -Wall
+FLAGS = -Wall -lm
 
 OBJECTS = main.o lib/bitmap.o
 TARGET = brightness_changer.out

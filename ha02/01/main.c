@@ -3,46 +3,77 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
+#include <pmmintrin.h>
 
 #include "lib/bitmap.h"
 
-#define MAX(x, y) ((x < y) ? y : x) // getting the maximum of two values
-#define MIN(x, y) ((x > y) ? y : x) // getting the minimum of two values
-
 // manipulating the brightnes of a bitmap (HSV)
-void manipulate(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height, int offset)
+void manipulate(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height, float brighten_rate)
 {
-    for (uint32_t i = 0; i < width * height; i++) {
-        bitmap_pixel_hsv_t *current_pixel = &pixels[i];
+    float *brightness_buffer = NULL;
+    
+    uint32_t pixel_count = width * height;
+    uint32_t buffer_size = (pixel_count) % 4 == 0 ? pixel_count : pixel_count + (4 - pixel_count % 4);
 
-        int pixel_value_v = (int)(current_pixel->v);
-        pixel_value_v += offset;
+    posix_memalign((void**)&brightness_buffer, 16, sizeof(float) * buffer_size);
+    
+    for(size_t i = 0; i < buffer_size; i++)
+        if(i < pixel_count) brightness_buffer[i] = (float)pixels[i].v;
+        else                brightness_buffer[i] = 0.0f;
+    
+    
+    float *temp_buff = NULL;
+    posix_memalign((void**)&temp_buff, 16, sizeof(float) * 4);    
+    for(size_t i = 0; i < 4; i++) temp_buff[i] = 255.0f;
+    __m128 v_max = _mm_load_ps(temp_buff);
+    free(temp_buff);
 
-        pixel_value_v = MIN(255, MAX(0, pixel_value_v));
+    posix_memalign((void**)&temp_buff, 16, sizeof(float) * 4);    
+    for(size_t i = 0; i < 4; i++) temp_buff[i] = brighten_rate;
+    __m128 brightness_rate_sse = _mm_load_ps(temp_buff);
+    free(temp_buff);
 
-        current_pixel->v = (bitmap_component_t)pixel_value_v;
+    // new_v_c = v_c + delta * brighten_rate;
+    for (size_t i = 0; i < buffer_size / 4; i++) {
+        __m128 current = _mm_load_ps(brightness_buffer + i * 4);
+        
+        __m128 delta;
+        if (brighten_rate < 0) delta = current;
+        else                   delta = _mm_sub_ps(v_max, current);
+        
+        __m128 weigthed_delta = _mm_mul_ps(delta, brightness_rate_sse);
+        current = _mm_add_ps(weigthed_delta, current);
+
+        _mm_store_ps(brightness_buffer + 4 * i, current);
     }
+    
+    for(size_t i = 0; i < buffer_size; i++)
+        pixels[i].v = (bitmap_component_t)brightness_buffer[i];
+        
+    free(brightness_buffer);
 }
 
 // creating new file path using strncat() (file_path + darker/brigther + offset)
-void create_new_filename(char *old_file_path, int offset, char *modified_file_path)
+void create_new_filename(char *old_file_path, float brighten_rate, char *modified_file_path)
 {
     strncpy(modified_file_path, old_file_path, strlen(old_file_path) - 4);
     strncat(modified_file_path, "_", 255);
 
-    if (offset >= 0) strncat(modified_file_path, "brighter", 255);
-    else             strncat(modified_file_path, "darker", 255);
+    if (brighten_rate >= 0) strncat(modified_file_path, "brighter", 255);
+    else                    strncat(modified_file_path, "darker", 255);
     strncat(modified_file_path, "_", 255);
 
-    char offset_buffer[4];
-    sprintf(offset_buffer, "%d", abs(offset));
+    char offset_buffer[6];
+    memset(offset_buffer, 0, 6);
+    sprintf(offset_buffer, "%.2f", fabs(brighten_rate));
     strncat(modified_file_path, offset_buffer, 255);
 
     strncat(modified_file_path, ".bmp", 255);
 }
-
+ 
 // reading, calling manipulate function and writing pixels back
-bitmap_error_t brighten_image(char *file_path, int offset)
+bitmap_error_t brighten_image(char *file_path, float brighten_rate)
 {
     // read the bitmap pixels
     bitmap_error_t error;
@@ -62,11 +93,11 @@ bitmap_error_t brighten_image(char *file_path, int offset)
     if (error != BITMAP_ERROR_SUCCESS) return error;
 
     // manipulate the pixels
-    manipulate(pixels, width, height, offset);
+    manipulate(pixels, width, height, brighten_rate);
 
     // get the new filename
     char modified_file_path[256];
-    create_new_filename(file_path, offset, modified_file_path);
+    create_new_filename(file_path, brighten_rate, modified_file_path);
 
     // parameters of the written image
     bitmap_parameters_t params = {
@@ -103,13 +134,13 @@ int main(int argc, char **argv)
 {
     // getting the arguments from terminal input
     int opt;
-    char *offset_str;
+    char *brighten_string;
     char *load_file_path;
 
     while ((opt = getopt(argc, argv, "b:")) != -1) {
         switch (opt) {
             case 'b':
-                offset_str = optarg;
+                brighten_string = optarg;
                 break;
             // triggered on unrecognized option
             case '?':
@@ -119,15 +150,11 @@ int main(int argc, char **argv)
         }
     }
 
-    int offset = atoi(offset_str);
+    float brighten_rate = (float)atof(brighten_string);
 
     // error handling for offset error
-    if (offset == 0) {
-        fprintf(stderr, "The offset was 0 or invalid! Exiting...\n\n");
-        print_help();
-        return 1;
-    } else if (offset < -100 || offset > 100) {
-        fprintf(stderr, "The offset was not in the valid range from -100 to 100! Exiting...\n");
+    if (brighten_rate < -1.0f || brighten_rate > 1.0f) {
+        fprintf(stderr, "The offset was not in the valid range from -1 to 1! Exiting...\n");
         return 1;
     }
 
@@ -136,7 +163,7 @@ int main(int argc, char **argv)
     for (uint32_t index = optind; index < argc; index++) {
         load_file_path = argv[index];
 
-        error = brighten_image(load_file_path, offset);
+        error = brighten_image(load_file_path, brighten_rate);
 
         switch (error) {
             case BITMAP_ERROR_INVALID_PATH:

@@ -17,7 +17,7 @@ typedef int bitmap_logging_t;
 #define BITMAP_LOGGING_DEFAULT 1
 #define BITMAP_LOGGING_VERBOSE 2
 
-#define BITMAP_LOGGING BITMAP_LOGGING_VERBOSE
+#define BITMAP_LOGGING BITMAP_LOGGING_NONE
 
 //The kind of DIB header that is used for the bitmap:
 typedef uint16_t bitmap_dib_header_format_t;

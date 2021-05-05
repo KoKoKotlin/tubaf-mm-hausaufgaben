@@ -1,9 +1,9 @@
 SHELL = /bin/bash
 CC = gcc
-FLAGS = -Wall
+FLAGS = -Wall -lm -march=native
 
 OBJECTS = main.o lib/bitmap.o
-TARGET = alpha_blender.out
+TARGET = brightness_changer.out
 
 $(TARGET) : $(OBJECTS)
 	$(CC) -o $(TARGET) $(OBJECTS)
