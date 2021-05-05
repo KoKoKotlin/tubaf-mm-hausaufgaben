@@ -24,4 +24,4 @@ bitmap.o : lib/bitmap.h
 
 .PHONY : clean
 clean :
-	rm -rf $(TARGET) $(OBJECTS)
+	rm -rf $(TARGET) $(OBJECTS) *.bmp

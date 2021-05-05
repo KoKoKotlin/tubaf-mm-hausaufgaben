@@ -132,13 +132,14 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
             __m128 z_real = real_part;
             __m128 z_imag = imag_part;
 
-            __m128 bounded = ones;
+            __m128 bounded_info = _mm_set1_ps(-NAN);
+            __m128 bounded      = ones;
 
             //iteration steps
             size_t mk = 0;
             __m128 mks = _mm_set1_ps(0.0f);
 
-            while (++mk < s->iterations) {
+            while (++mk < s->iterations && _mm_movemask_ps(bounded_info)) {
                 // z_n+1 = z_n² + c = (a + bi)^2 + c
                 // Re(z_n+1) = a^2 - b^2 + cr
                 // Im(z_n+1) = 2 * a * b + ci
@@ -163,13 +164,8 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
                 
                 //bounded and therefore part of the mandelbrot set, if |z_n+1| > 2
                 __m128 z_abs = _mm_add_ps(z_real_2, z_imag_2);
-                bounded = _mm_and_ps(_mm_cmplt_ps(z_abs, fours), ones);
-
-#ifdef DEBUG
-                print_mm(bounded);
-                printf("\n");
-                print_mm(z_abs);
-#endif
+                bounded_info = _mm_cmplt_ps(z_abs, fours);
+                bounded = _mm_and_ps(bounded_info, ones);
 
                 mks = _mm_add_ps(mks, bounded);
             }
