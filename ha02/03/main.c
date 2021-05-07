@@ -3,6 +3,8 @@
 #include <math.h>
 #include <string.h>
 #include <emmintrin.h>
+#include <time.h>
+
 #include "lib/bitmap.h"
 
 struct MandelSpec {
@@ -18,6 +20,7 @@ struct MandelSpec {
 };
 
 void mandel_basic(bitmap_pixel_rgb_t *image, const struct MandelSpec *s){
+    clock_t start = clock();
     //x and y range in the complex plane
     float xdiff = s->xlim[1] - s->xlim[0];
     float ydiff = s->ylim[1] - s->ylim[0];
@@ -73,6 +76,7 @@ void mandel_basic(bitmap_pixel_rgb_t *image, const struct MandelSpec *s){
             image[y * s->width + x].b = pixelValue;
         }
     }
+    printf("Mandel Basic: %.6fms\n", (double)(clock() - start) / (CLOCKS_PER_SEC / 1000));
 }
 
 inline static __m128 load_array(float* arr)
@@ -102,6 +106,7 @@ void print_mm(__m128 m) {
 
 void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
 {   
+    clock_t start = clock();
     float xdiff = s->xlim[1] - s->xlim[0];
     float ydiff = s->ylim[1] - s->ylim[0];
 
@@ -199,6 +204,111 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
     }
 
     free(out_buffer);
+    printf("Mandel SSE: %.6fms\n", (double)(clock() - start) / (CLOCKS_PER_SEC / 1000));
+}
+
+void mandel_sse24(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
+{   
+    clock_t start = clock();
+    float xdiff = s->xlim[1] - s->xlim[0];
+    float ydiff = s->ylim[1] - s->ylim[0];
+
+    float iter_scale = 1.0f / s->iterations;
+    float depth_scale = s->depth - 1;
+
+    __m128 xdiff_sse  = _mm_set1_ps(xdiff);
+    __m128 ydiff_sse  = _mm_set1_ps(ydiff);
+    __m128 xlim_sse   = _mm_set1_ps(s->xlim[0]);
+    __m128 ylim_sse   = _mm_set1_ps(s->ylim[0]);
+    __m128 width_sse  = _mm_set1_ps((float)s->width);
+    __m128 height_sse = _mm_set1_ps((float)s->height);
+    __m128 ones       = _mm_set1_ps(1.0f);
+    __m128 fours      = _mm_set1_ps(4.0f);
+
+    float *out_buffer = NULL;
+    posix_memalign((void**)&out_buffer, 16, sizeof(float) * make_div_by_four(s->width) * s->height);
+
+    //iterate over all pixels in the image
+    for(float y = 0; y < s->height; y++) {
+        for(float x = 0; x < make_div_by_four(s->width) / 4; x++) {
+            float xarr[] = { x * 4, x * 4 + 1, x * 4 + 2, x * 4 + 3 };
+
+            __m128 xs = load_array(xarr);
+            __m128 ys = _mm_set1_ps(y);
+
+            __m128 real_part = coordinate_transformation(xs, xdiff_sse, width_sse,  xlim_sse);
+            __m128 imag_part = coordinate_transformation(ys, ydiff_sse, height_sse, ylim_sse);
+            
+            //this will be z_n, here the initial term z0
+            __m128 z_real = real_part;
+            __m128 z_imag = imag_part;
+
+            __m128 bounded_info = _mm_set1_ps(-NAN);
+            __m128 bounded      = ones;
+
+            //iteration steps
+            size_t mk = 1;
+            __m128 mks = _mm_set1_ps(0.0f);
+
+            while (mk < s->iterations && _mm_movemask_ps(bounded_info)) {
+                // z_n+1 = z_n² + c = (a + bi)^2 + c
+                // Re(z_n+1) = a^2 - b^2 + cr
+                // Im(z_n+1) = 2 * a * b + ci
+
+                __m128 z_real_2 = _mm_mul_ps(z_real, z_real);
+                __m128 z_imag_2 = _mm_mul_ps(z_imag, z_imag);
+                __m128 z_mixed  = _mm_mul_ps(z_imag, z_real);
+                
+                __m128 new_z_real = _mm_add_ps(_mm_sub_ps(z_real_2, z_imag_2), real_part);
+                __m128 new_z_imag = _mm_add_ps(_mm_add_ps(z_mixed, z_mixed), imag_part);
+                
+                __m128 new_z_real_diff = _mm_sub_ps(new_z_real, z_real);
+                __m128 new_z_imag_diff = _mm_sub_ps(new_z_imag, z_imag);
+                
+                //save z_n+1
+                z_real = _mm_add_ps(z_real, _mm_mul_ps(new_z_real_diff, bounded));
+                z_imag = _mm_add_ps(z_imag, _mm_mul_ps(new_z_imag_diff, bounded));
+
+
+                z_real_2 = _mm_mul_ps(z_real, z_real);
+                z_imag_2 = _mm_mul_ps(z_imag, z_imag);
+                
+                //bounded and therefore part of the mandelbrot set, if |z_n+1| > 2
+                __m128 z_abs = _mm_add_ps(z_real_2, z_imag_2);
+                bounded_info = _mm_cmplt_ps(z_abs, fours);
+                bounded = _mm_and_ps(bounded_info, ones);
+
+                mks = _mm_add_ps(mks, bounded);
+                mk+=4; //4 steps each loop
+            }
+
+            __m128 iter_scale_sse  = _mm_set1_ps(iter_scale);
+            __m128 depth_scale_sse = _mm_set1_ps(depth_scale);
+
+            //mk is between 0 and s->iterations
+            //scale it to fit between 0 and 1
+            mks = _mm_mul_ps(mks, iter_scale_sse);
+
+            //damping for nicer color gradients
+            mks = _mm_sqrt_ps(mks);
+
+            //scale up with color depth of image
+            mks = _mm_mul_ps(mks, depth_scale_sse);
+
+            _mm_store_ps(out_buffer + (size_t)y * s->width + (size_t)x * 4, mks);
+        }
+    }
+
+    for(size_t y = 0; y < s->height; y++) {
+        for (size_t x = 0; x < s->width; x++) {
+            image[y * s->width + x].r = (uint8_t)out_buffer[y * s->width + x];
+            image[y * s->width + x].g = (uint8_t)out_buffer[y * s->width + x];
+            image[y * s->width + x].b = (uint8_t)out_buffer[y * s->width + x];
+        }
+    }
+
+    free(out_buffer);
+    printf("Mandel SSE x4: %.6fms\n", (double)(clock() - start) / (CLOCKS_PER_SEC / 1000));
 }
 
 int main(int argc, char *argv[]){
@@ -254,11 +364,13 @@ int main(int argc, char *argv[]){
 
     bitmap_pixel_t *image = malloc(spec.width * spec.height * sizeof(bitmap_pixel_t));
 
-#ifdef NORMAL
+
     mandel_basic((bitmap_pixel_rgb_t*)image, &spec);
-#else
+
     mandel_sse2((bitmap_pixel_rgb_t*)image, &spec);
-#endif
+
+    mandel_sse24((bitmap_pixel_rgb_t*)image, &spec);
+
 
     bitmap_parameters_t params;
     memset(&params, 0, sizeof(bitmap_parameters_t));
