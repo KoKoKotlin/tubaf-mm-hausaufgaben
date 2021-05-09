@@ -96,14 +96,16 @@ inline static size_t make_div_by_four(size_t s)
 // size_world:      size of the corresponding axis on world space
 // size_screen:     size of the corresponging axis on screen space
 // offset_world:    world space offset
-inline static __m128 coordinate_transformation(__m128 coords, __m128 size_world, __m128 size_screen, __m128 offset_world) {
+inline static __m128 coordinate_transformation(__m128 coords, __m128 size_world, __m128 size_screen, __m128 offset_world)
+{
     __m128 normalized_coords = _mm_div_ps(coords, size_screen);
     __m128 scaled_coords     = _mm_mul_ps(normalized_coords, size_world);
     return _mm_add_ps(scaled_coords, offset_world);
 }
 
 // debug print values of intrinsic register
-void print_mm(__m128 m) {
+void print_mm(__m128 m)
+{
     float temp[4];
     _mm_storeu_ps(temp, m);
 
@@ -135,8 +137,8 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
     posix_memalign((void**)&out_buffer, 16, sizeof(float) * make_div_by_four(s->width) * s->height);
 
     // iterate over all pixels in the image
-    for(float y = 0; y < s->height; y++) {
-        for(float x = 0; x < make_div_by_four(s->width) / 4; x++) {
+    for (float y = 0; y < s->height; y++) {
+        for (float x = 0; x < make_div_by_four(s->width) / 4; x++) {
             // current x and y values
             float xarr[] = { x * 4, x * 4 + 1, x * 4 + 2, x * 4 + 3 };
 
@@ -212,7 +214,7 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
     }
 
     // write the values back into the pixel array
-    for(size_t y = 0; y < s->height; y++) {
+    for (size_t y = 0; y < s->height; y++) {
         for (size_t x = 0; x < s->width; x++) {
             image[y * s->width + x].r = (uint8_t)out_buffer[y * s->width + x];
             image[y * s->width + x].g = (uint8_t)out_buffer[y * s->width + x];
