@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include <pmmintrin.h>
 #include <immintrin.h>
 
@@ -25,7 +26,7 @@ uint32_t supports_avx2()
     return rbx >> 5 & 1;
 }
 
-// manipulating the brightnes of a bitmap (HSV)
+// manipulating the brightnes of a bitmap (HSV) and speed it up with avx2 intrinsics
 void manipulate_avx2(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height, float brighten_rate)
 {
     // get a buffer for the brightness values (16 byte aligned)
@@ -48,7 +49,7 @@ void manipulate_avx2(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height
     
     // new_v_c = v_c + delta * brighten_rate;
     // calculate the new brightness values with the help of the formula above
-     (size_t i = 0; i < buffer_size / 4; i++) {
+    for (size_t i = 0; i < buffer_size / 4; i++) {
         __m128 current = _mm_load_ps(brightness_buffer + i * 4);
         
         __m128 delta;
@@ -62,7 +63,7 @@ void manipulate_avx2(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height
     }
     
     // copy the values back into the pixel array
-    (size_t i = 0; i < buffer_size; i++)
+    for (size_t i = 0; i < buffer_size; i++)
         pixels[i].v = (bitmap_component_t)brightness_buffer[i];
         
     free(brightness_buffer);
@@ -151,7 +152,7 @@ bitmap_error_t brighten_image(char *file_path, float brighten_rate)
 
     // check for avx2 support and manipulate the pixels
     if (supports_avx2()) manipulate_avx2(pixels, width, height, brighten_rate);
-    else                 manipulate_see(pixels, width, height, brighten_rate);
+    else                 manipulate_sse(pixels, width, height, brighten_rate);
 
     // get the new filename
     char modified_file_path[256];
