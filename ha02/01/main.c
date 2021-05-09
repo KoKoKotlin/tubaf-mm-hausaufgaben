@@ -8,25 +8,29 @@
 
 #include "lib/bitmap.h"
 
-// manipulating the brightnes of a bitmap (HSV)
+// manipulating the brightnes of a bitmap (HSV) and speed it up with sse intrinsics
 void manipulate(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height, float brighten_rate)
 {
+
+    // get a buffer for the brightness values (16 byte aligned)
     float *brightness_buffer = NULL;
     
     uint32_t pixel_count = width * height;
     uint32_t buffer_size = (pixel_count) % 4 == 0 ? pixel_count : pixel_count + (4 - pixel_count % 4);
 
     posix_memalign((void**)&brightness_buffer, 16, sizeof(float) * buffer_size);
-    
+
+    // copy the values into the buffer
     for(size_t i = 0; i < buffer_size; i++)
         if(i < pixel_count) brightness_buffer[i] = (float)pixels[i].v;
         else                brightness_buffer[i] = 0.0f;
     
-    
+    // constants for the intrinsics calculation
     __m128 v_max = _mm_set1_ps(255.0f);
     __m128 brightness_rate_sse = _mm_set1_ps(brighten_rate);
     
     // new_v_c = v_c + delta * brighten_rate;
+    // calculate the new brightness values with the help of the formula above
     for (size_t i = 0; i < buffer_size / 4; i++) {
         __m128 current = _mm_load_ps(brightness_buffer + i * 4);
         
@@ -40,6 +44,7 @@ void manipulate(bitmap_pixel_hsv_t *pixels, uint32_t width, uint32_t height, flo
         _mm_store_ps(brightness_buffer + 4 * i, current);
     }
     
+    // copy the values back into the pixel array
     for(size_t i = 0; i < buffer_size; i++)
         pixels[i].v = (bitmap_component_t)brightness_buffer[i];
         
