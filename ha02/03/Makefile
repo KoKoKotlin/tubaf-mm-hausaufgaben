@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 CC = gcc
-FLAGS = -Wall -lm
+FLAGS = -Wall -lm -O3
 
 OBJECTS = main.o lib/bitmap.o
 TARGET = mandel.out

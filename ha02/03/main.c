@@ -153,9 +153,8 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
             __m128 z_real = real_part;
             __m128 z_imag = imag_part;
 
-            // information for boundedness needed for terminating the loop early for saving redundant calculations
+
             __m128 bounded_info = _mm_set1_ps(-NAN);
-            __m128 bounded      = ones;
 
             // iteration counter
             size_t mk = 0;
@@ -171,17 +170,9 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
                 __m128 z_imag_2 = _mm_mul_ps(z_imag, z_imag);       // z_imag^2
                 __m128 z_mixed  = _mm_mul_ps(z_imag, z_real);       // z_real * z_imag
                 
-                // calculate the next iteration
-                __m128 new_z_real = _mm_add_ps(_mm_sub_ps(z_real_2, z_imag_2), real_part);
-                __m128 new_z_imag = _mm_add_ps(_mm_add_ps(z_mixed, z_mixed), imag_part);
-
-                // z_n+1 - z_n
-                __m128 new_z_real_diff = _mm_sub_ps(new_z_real, z_real);
-                __m128 new_z_imag_diff = _mm_sub_ps(new_z_imag, z_imag);
-                
-                // save z_n+1 only when the last iteration was bounded keep the old value otherwise
-                z_real = _mm_add_ps(z_real, _mm_mul_ps(new_z_real_diff, bounded));
-                z_imag = _mm_add_ps(z_imag, _mm_mul_ps(new_z_imag_diff, bounded));
+                // save z_n+1
+                z_real = _mm_add_ps(_mm_sub_ps(z_real_2, z_imag_2), real_part);
+                z_imag = _mm_add_ps(_mm_add_ps(z_mixed, z_mixed), imag_part);
 
                 // calculate the new squares of the real and imaginary parts
                 z_real_2 = _mm_mul_ps(z_real, z_real);
@@ -190,7 +181,7 @@ void mandel_sse2(bitmap_pixel_rgb_t *image, const struct MandelSpec *s)
                 // check if bounded and increase the counters accordingly
                 __m128 z_abs = _mm_add_ps(z_real_2, z_imag_2);
                 bounded_info = _mm_cmplt_ps(z_abs, fours);
-                bounded = _mm_and_ps(bounded_info, ones);
+                __m128 bounded = _mm_and_ps(bounded_info, ones);
 
                 mks = _mm_add_ps(mks, bounded);
             }
