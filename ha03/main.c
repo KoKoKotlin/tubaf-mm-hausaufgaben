@@ -48,11 +48,13 @@ enum compression_state {
 	HETEROGENEOUS
 };
 
-static inline void put_byte(char c, FILE *stdout_handle) {
+static inline void put_byte(char c, FILE *stdout_handle)
+{
 	fwrite(&c, 1, 1, stdout_handle);
 }
 
-void output_het(char *buffer, size_t count, FILE *stdout_handle) {
+void output_het(char *buffer, size_t count, FILE *stdout_handle)
+{
 	unsigned char status = count;
 	if (status == 0x00) return;
 
@@ -60,7 +62,8 @@ void output_het(char *buffer, size_t count, FILE *stdout_handle) {
 	fwrite(buffer, 1, count, stdout_handle);
 }
 
-void output_hom(char c, int count, FILE *stdout_handle) {
+void output_hom(char c, int count, FILE *stdout_handle)
+{
 	unsigned char status = 0x80 | count;
 
 	put_byte(status, stdout_handle);
