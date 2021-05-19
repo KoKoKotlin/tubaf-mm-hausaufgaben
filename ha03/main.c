@@ -94,12 +94,7 @@ int compress()
 			break;
 		case HOMOGENEOUS:
 			count++;
-			if (x == x_1) {
-				if (count >= 127 || x_1 == EOF) {
-					output_hom(x, count, stdout_handle);
-					current_state = UNDECIDED;
-				}
-			} else {
+			if (x != x_1 || count >= 127 || x_1 == EOF) {
 				output_hom(x, count, stdout_handle);
 				current_state = UNDECIDED;
 			}
@@ -114,7 +109,6 @@ int compress()
 				}
 			} else {
 				output_het(buffer, count, stdout_handle);
-				memset(buffer, 0, 128);
 				current_state = HOMOGENEOUS;
 				count = 1;
 			}
