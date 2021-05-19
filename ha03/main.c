@@ -47,12 +47,12 @@ enum compression_state {
 	HETEROGENEOUS
 };
 
-void output_het(char *buffer, FILE *stdout_handle) {
-	unsigned char status = strlen(buffer);
+void output_het(char *buffer, size_t count, FILE *stdout_handle) {
+	unsigned char status = count;
 	if (status == 0x00) return;
 
 	fwrite(&status, 1, 1, stdout_handle);
-	fwrite(buffer, strlen(buffer), 1, stdout_handle);
+	fwrite(buffer, 1, count, stdout_handle);
 }
 
 void output_hom(char c, int count, FILE *stdout_handle) {
@@ -74,10 +74,13 @@ int compress()
 
 	size_t count = 0;
 
-	char x = fgetc(stdin_handle);
-	char x_1 = fgetc(stdin_handle);
+	char x;
+	size_t res1 = fread(&x, 1, 1, stdin_handle);
 
-	while (x != EOF) {
+	char x_1;
+	size_t res2 = fread(&x_1, 1, 1, stdin_handle);
+
+	while (res1 != 0) {
 		switch (current_state) {
 		case META:
 			count = 0;
@@ -94,27 +97,25 @@ int compress()
 		case HOMOGENEOUS:
 			count++;
 			if (x == x_1) {
-				if (count >= 127) {
+				if (count >= 127 || res2 == 0) {
 					output_hom(x, count, stdout_handle);
 					current_state = META;
 				}
 			} else {
 				output_hom(x, count, stdout_handle);
-				current_state = HETEROGENEOUS;
-				count = 0;
-				memset(buffer, 0, 128);
+				current_state = META;
 			}
 			break;
 		case HETEROGENEOUS:
 			if (x != x_1) {
 				buffer[count++] = x;
 
-				if (count >= 127 || x_1 == EOF) {
-					output_het(buffer, stdout_handle);
+				if (count >= 127 || res2 == 0) {
+					output_het(buffer, count, stdout_handle);
 					current_state = META;
 				}
 			} else {
-				output_het(buffer, stdout_handle);
+				output_het(buffer, count, stdout_handle);
 				memset(buffer, 0, 128);
 				current_state = HOMOGENEOUS;
 				count = 1;
@@ -123,7 +124,9 @@ int compress()
 		}
 
 		x = x_1;
-		x_1 = fgetc(stdin_handle);
+		res1 = res2;
+		res2 = fread(&x_1, 1, 1, stdin_handle);
+		x_1 = (res2 == 0) ? x - 1 : x_1; // hack bc there is no EOF indicator
 	}
 
     fclose(stdin_handle);
