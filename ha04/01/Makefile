@@ -14,4 +14,4 @@ $(TARGET) : $(OBJECTS)
 
 .PHONY : clean
 clean :
-	rm -rf $(TARGET) $(OBJECTS)
+	rm -rf $(TARGET) $(OBJECTS) *.bmp *.bin

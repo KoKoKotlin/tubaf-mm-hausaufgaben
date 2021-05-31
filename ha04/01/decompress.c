@@ -91,7 +91,6 @@ int decompress(const char* file_path, const uint32_t* quant_matrix, const char* 
 	{
 		for (uint32_t index_x = 0; index_x < blocks_x; index_x++)
 		{
-
 			int8_t input_block[64];
 			int8_t un_zig_zagged[64];
 			float de_quantized[64];
@@ -99,16 +98,8 @@ int decompress(const char* file_path, const uint32_t* quant_matrix, const char* 
 
 			fread(input_block, 1, 64, input_file);
 			un_zig_zag(input_block, un_zig_zagged);
-			CLAMP(-128.0f, 127.0f, de_quantized);
-
 			dequantize(un_zig_zagged, quant_matrix, de_quantized);
-			CLAMP(-1024.0f, 1016.0f, de_quantized);
-
 			perform_inverse_dct(de_quantized, inverse_dct, cosine_values);
-			CLAMP(-128.0f, 127.0f, inverse_dct);
-			if (index_x == 95 && index_y == 45)
-				FOR_WRAPPER(printf("%f ", inverse_dct[__i]));
-
 
 			write_block(pixels, index_x, index_y, blocks_x, blocks_y, inverse_dct);
 		}
