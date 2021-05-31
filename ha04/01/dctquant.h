@@ -17,6 +17,10 @@ extern uint32_t zig_zag_index_matrix[64];
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
+#define FOR_WRAPPER(p) for (size_t __i = 0; __i < 64; __i++) p
+
+#define CLAMP(low, high, block) for (size_t ____i = 0; ____i < 64; ____i++) block[____i] = MIN(high, MAX(low, block[____i]))
+
 // Alpha coefficients:
 float alpha(uint8_t pq);
 

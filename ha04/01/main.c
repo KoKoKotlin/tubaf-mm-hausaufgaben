@@ -108,7 +108,7 @@ int main(int argc, char** argv)
 	// Build the quantization matrix:
 	uint32_t quant_matrix[64];
 
-	float q_factor = (quantization_factor <= 50) ? (50.0f / quantization_factor) : (2.0f - (2.0f * quantization_factor) / 100.0f);
+	float q_factor = (quantization_factor <= 50) ? (50.0f / quantization_factor) : (2.0f - ((2.0f * quantization_factor) / 100.0f));
 
 	for (size_t i = 0; i < 64; i++)
 		quant_matrix[i] = (uint32_t)ceilf(q_factor * default_quant_matrix[i]);

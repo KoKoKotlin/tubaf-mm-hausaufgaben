@@ -111,7 +111,7 @@ static void perform_dct(const float* input_block, float* output_block, float cos
 static void quantize(float* input_block, const uint32_t* quant_matrix, int8_t* output_block)
 {
 	for (size_t i = 0; i < 64; i++)
-		output_block[i] = (int8_t)roundf(input_block[i] / quant_matrix[i]);
+		output_block[i] = (int8_t)MIN(127.0f, MAX(-128.0f, roundf(input_block[i] / quant_matrix[i])));
 }
 
 // Perform zig-zag encoding.
@@ -185,6 +185,8 @@ int compress(const char* file_path, const uint32_t* quant_matrix, const char* gr
 
 			// Quantize:
 			quantize(dct_block, quant_matrix, quantized_block);
+			if (index_x == 95 && index_y == 45)
+				FOR_WRAPPER(printf("%d ", quantized_block[__i]));
 
 			// ZigZag:
 			zig_zag(quantized_block, zig_zagged_block);
