@@ -318,7 +318,7 @@ static void load_kf(user_data_t* user_data) {
     int texture_height = 0;
     int bits_per_pixel = 0;
 
-	stbi_uc *texture_buffer = stbi_load("img.jpg", &texture_width, &texture_height, &bits_per_pixel, 4);
+	stbi_uc *texture_buffer = stbi_load("kf_pink.png", &texture_width, &texture_height, &bits_per_pixel, 4);
 
     // load the texture to the graphics card
     GLuint texture_id;

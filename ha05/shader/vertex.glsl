@@ -34,5 +34,6 @@ void main()
     if (hsv.x > 1.0) hsv.x -= 1.0;
     vec3 rgb = hsv2rgb(hsv);
     f_color = rgb;
+
     texCoord = v_texCoords;
 }
