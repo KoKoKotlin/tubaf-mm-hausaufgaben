@@ -19,7 +19,7 @@ static void un_zig_zag(const int8_t* input_block, int8_t* output_block)
 static void dequantize(const int8_t* input_block, const uint32_t* quant_matrix, float* output_block)
 {
 	for (size_t i = 0; i < 64; i++)
-		output_block[i] = ((float)input_block[i] * quant_matrix[i]);
+		output_block[i] = ((float)input_block[i] * (float)quant_matrix[i]);
 }
 
 static float idct_sum(const float *input_block, uint8_t m, uint8_t n, float cosine_values[8][8])
@@ -81,22 +81,21 @@ int decompress(const char* file_path, const uint32_t* quant_matrix, const char* 
 	if (!input_file)
 		return -1;
 
-	fread(&blocks_x, 4, 1, input_file);
-	fread(&blocks_y, 4, 1, input_file);
+	fread(&blocks_x, sizeof(uint32_t), 1, input_file);
+	fread(&blocks_y, sizeof(uint32_t), 1, input_file);
 
 	bitmap_pixel_rgb_t *pixels = malloc(sizeof(bitmap_pixel_rgb_t) * blocks_x * blocks_y * 64);
-
-	int8_t input_block[64];
-
-	int8_t un_zig_zagged[64];
-	float de_quantized[64];
-	float inverse_dct[64];
 
 	// Walk all the blocks:
 	for (uint32_t index_y = 0; index_y < blocks_y; index_y++)
 	{
 		for (uint32_t index_x = 0; index_x < blocks_x; index_x++)
 		{
+			int8_t input_block[64];
+			int8_t un_zig_zagged[64];
+			float de_quantized[64];
+			float inverse_dct[64];
+
 			fread(input_block, 1, 64, input_file);
 			un_zig_zag(input_block, un_zig_zagged);
 			dequantize(un_zig_zagged, quant_matrix, de_quantized);

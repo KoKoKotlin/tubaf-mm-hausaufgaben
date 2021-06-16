@@ -1,7 +1,7 @@
 SHELL = /bin/bash
 CC = gcc
-FLAGS = -Wall
-LDFLAGS=-lm -pthread
+FLAGS = -Wall -fopenmp -O3
+LDFLAGS=-lm -lgomp
 
 OBJECTS = main.o bitmap.o compress.o decompress.o dctquant.o
 TARGET = dct

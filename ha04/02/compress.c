@@ -5,6 +5,8 @@
 #include <string.h>
 #include <pthread.h>
 
+#include <omp.h>
+
 #include "dctquant.h"
 #include "bitmap.h"
 
@@ -31,15 +33,13 @@ static bitmap_pixel_hsv_t* create_grayscale_bitmap(const char* input_path, const
 
 	bitmap_error_t error = bitmapReadPixels(input_path, (bitmap_pixel_t**)&pixels, &width_px, &height_px, BITMAP_COLOR_SPACE_HSV);
 
-	if (error != BITMAP_ERROR_SUCCESS)
-	{
+	if (error != BITMAP_ERROR_SUCCESS) {
 		printf("Failed to read bitmap, does it exist?\n");
 		return NULL;
 	}
 
 	// Make sure the bitmap has a multiple of 8 pixels in both dimensions:
-	if ((width_px % 8) || (height_px % 8))
-	{
+	if ((width_px % 8) || (height_px % 8)) {
 		printf("Width and height must be a multiple of 8 pixels.\n");
 		free(pixels);
 
@@ -51,13 +51,10 @@ static bitmap_pixel_hsv_t* create_grayscale_bitmap(const char* input_path, const
 	*blocks_y = height_px / 8;
 
 	// Dump the bitmap if requested:
-	if (output_path)
-	{
+	if (output_path) {
 		// Convert to grayscale:
 		for (uint32_t i = 0; i < (width_px * height_px); i++)
-		{
 			pixels[i].s = 0;
-		}
 
 		bitmap_parameters_t params =
 		{
@@ -72,8 +69,7 @@ static bitmap_pixel_hsv_t* create_grayscale_bitmap(const char* input_path, const
 
 		error = bitmapWritePixels(output_path, BITMAP_BOOL_TRUE, &params, (bitmap_pixel_t*)pixels);
 
-		if (error != BITMAP_ERROR_SUCCESS)
-		{
+		if (error != BITMAP_ERROR_SUCCESS) {
 			printf("Failed to write grayscale bitmap.\n");
 			free(pixels);
 
@@ -92,12 +88,10 @@ static void read_block(const bitmap_pixel_hsv_t* pixels, uint32_t index_x, uint3
 	uint32_t base_offset = index_y * 8 * bytes_per_row;
 	uint32_t col_offset = index_x * 8;
 
-	for (uint32_t curr_y = 0; curr_y < 8; curr_y++)
-	{
+	for (uint32_t curr_y = 0; curr_y < 8; curr_y++) {
 		uint32_t row_offset = curr_y * bytes_per_row;
 
-		for (uint32_t curr_x = 0; curr_x < 8; curr_x++)
-		{
+		for (uint32_t curr_x = 0; curr_x < 8; curr_x++) {
 			block[(8 * curr_y) + curr_x] = pixels[base_offset + row_offset + col_offset + curr_x].v - 128.0f;
 		}
 	}
@@ -187,8 +181,7 @@ int compress(const char* file_path, const uint32_t* quant_matrix, const char* gr
 	// Open the output file (.dct):
 	FILE* file = fopen(output_path, "wb");
 
-	if (!file)
-	{
+	if (!file) {
 		printf("Failed to create output file.\n");
 		free(pixels);
 		free(output_byte_buffer);
@@ -198,8 +191,7 @@ int compress(const char* file_path, const uint32_t* quant_matrix, const char* gr
 
 	// Write the number of blocks at the start:
 	// FIXME: Respect endianness!
-	if (fwrite(&blocks_x, sizeof(blocks_x), 1, file) != 1)
-	{
+	if (fwrite(&blocks_x, sizeof(blocks_x), 1, file) != 1) {
 		printf("Failed to write the number of blocks in x direction.\n");
 
 		free(pixels);
@@ -210,8 +202,7 @@ int compress(const char* file_path, const uint32_t* quant_matrix, const char* gr
 		return -1;
 	}
 
-	if (fwrite(&blocks_y, sizeof(blocks_y), 1, file) != 1)
-	{
+	if (fwrite(&blocks_y, sizeof(blocks_y), 1, file) != 1) {
 		printf("Failed to write the number of blocks in y direction.\n");
 
 		free(pixels);
@@ -222,36 +213,31 @@ int compress(const char* file_path, const uint32_t* quant_matrix, const char* gr
 		return -1;
 	}
 
-	// start 8 threads for seperate areas
-	pthread_t ids[THREAD_COUNT];
-	for(size_t i = 0; i < THREAD_COUNT; i++) {
+	int8_t *output_buffer = (int8_t*)malloc(blocks_x * blocks_y * 64);
 
-		size_t ystart = blocks_y / THREAD_COUNT * i;
-		size_t yend = blocks_y / THREAD_COUNT * (i + 1);
-		yend = (i == THREAD_COUNT - 1) ? blocks_y : yend;
+	#pragma omp parallel for shared(output_buffer)
+	for (uint32_t index_y = 0; index_y < blocks_y; index_y++) {
+		for (uint32_t index_x = 0; index_x < blocks_x; index_x++) {
+			float input_block[64];
+			float dct_block[64];
+			int8_t quantized_block[64];
+			int8_t zig_zagged_block[64];
 
-		struct arg_struct args =
-		{
-			.pixels = pixels,
-			.output_byte_buffer = output_byte_buffer,
-			.quant_matrix = quant_matrix,
-			.ystart = ystart,
-			.yend = yend,
-			.blocks_x = blocks_x,
-			.blocks_y = blocks_y,
-		};
+			read_block(pixels, index_x, index_y, blocks_x, blocks_y, input_block);
+			perform_dct(input_block, dct_block, cosine_values);
+			quantize(dct_block, quant_matrix, quantized_block);
+			zig_zag(quantized_block, zig_zagged_block);
 
-		pthread_create(&ids[i], NULL, compress_mem_area, (void *)(&args));
+			memcpy(output_buffer + (index_y * blocks_x + index_x) * 64, zig_zagged_block, 64);
+		}
 	}
 
-	for (size_t i = 0; i < THREAD_COUNT; i++)
-		pthread_join(ids[i], NULL);
-
-	fwrite(output_byte_buffer, 1, output_len, file);
+	#pragma omp barrier
+	fwrite(output_buffer, blocks_y * blocks_x * 64, 1, file);
 
 	// Free the pixels:
 	free(pixels);
-	free(output_byte_buffer);
+	free(output_buffer);
 
 	// Close the output file:
 	fclose(file);

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <omp.h>
 
 #include "dctquant.h"
 #include "bitmap.h"
@@ -86,18 +87,20 @@ int decompress(const char* file_path, const uint32_t* quant_matrix, const char* 
 
 	bitmap_pixel_rgb_t *pixels = malloc(sizeof(bitmap_pixel_rgb_t) * blocks_x * blocks_y * 64);
 
-	int8_t input_block[64];
+	int8_t *input_buffer = (int8_t*)malloc(blocks_y * blocks_x * 64);
+	fread(input_buffer, blocks_y * blocks_x * 64, 1, input_file);
 
-	int8_t un_zig_zagged[64];
-	float de_quantized[64];
-	float inverse_dct[64];
-
-	// Walk all the blocks:
+	#pragma omp parallel for shared(input_buffer)
 	for (uint32_t index_y = 0; index_y < blocks_y; index_y++)
 	{
 		for (uint32_t index_x = 0; index_x < blocks_x; index_x++)
 		{
-			fread(input_block, 1, 64, input_file);
+			int8_t input_block[64];
+			int8_t un_zig_zagged[64];
+			float de_quantized[64];
+			float inverse_dct[64];
+
+			memcpy(input_block, input_buffer + (index_y * blocks_x + index_x) * 64, 64);
 			un_zig_zag(input_block, un_zig_zagged);
 			dequantize(un_zig_zagged, quant_matrix, de_quantized);
 			perform_inverse_dct(de_quantized, inverse_dct, cosine_values);
@@ -106,6 +109,7 @@ int decompress(const char* file_path, const uint32_t* quant_matrix, const char* 
 		}
 	}
 
+	#pragma omp barrier
 	bitmap_parameters_t params = {
         .bottomUp = BITMAP_BOOL_TRUE,
         .widthPx = blocks_x * 8,
@@ -125,6 +129,8 @@ int decompress(const char* file_path, const uint32_t* quant_matrix, const char* 
     );
 
 	free(pixels);
+	free(input_buffer);
+
 	fclose(input_file);
 
 	return 0;
