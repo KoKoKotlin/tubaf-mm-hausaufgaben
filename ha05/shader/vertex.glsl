@@ -1,8 +1,11 @@
 #version 410
 layout(location = 0) in vec4 v_position;
 layout(location = 1) in vec3 v_color;
+layout(location = 2) in vec2 v_texCoords;
+
 
 out vec3 f_color;
+out vec2 texCoord;
 uniform float time;
 
 // source: https://stackoverflow.com/questions/15095909/from-rgb-to-hsv-in-opengl-glsl
@@ -31,4 +34,5 @@ void main()
     if (hsv.x > 1.0) hsv.x -= 1.0;
     vec3 rgb = hsv2rgb(hsv);
     f_color = rgb;
+    texCoord = v_texCoords;
 }

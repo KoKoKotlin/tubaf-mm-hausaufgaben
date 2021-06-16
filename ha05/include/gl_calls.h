@@ -9,6 +9,8 @@
 
 #define ATTRIB_POSITION 0
 #define ATTRIB_COLOR 1
+#define ATTRIB_TEXCOORD 2
+
 #define DELTA_TIME_INCREMENT 0.01f
 
 // TODO
@@ -27,14 +29,19 @@ typedef struct
     // VBO:
     GLuint vbo;
 
+    GLuint tex;
+
     float timer;
     float delta_time;
+
+    uint8_t suprise;
 } user_data_t;
 
 typedef struct
 {
     GLfloat position[3];
     GLubyte color[3];
+    GLfloat texCoords[2];
 } vertex_data_t;
 
 // Generic error checks:

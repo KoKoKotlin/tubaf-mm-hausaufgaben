@@ -4,9 +4,9 @@ CFLAGS=-c -Wall -O3 -Iinclude
 
 # TODO: Insert your OS-specific libs for GLFW!
 ifeq ($(OS),Windows_NT)
-	LDFLAGS=-Lsrc -lglfw3 -ldl -lopengl32 -lgdi32 -lm
+	LDFLAGS=-Lsrc -lSOIL -lglfw3 -ldl -lopengl32 -lgdi32 -lm
 else
-	LDFLAGS=-lglfw -ldl -lm
+	LDFLAGS=-lglfw -lSOIL -ldl -lm
 endif
 
 TARGET=n.out

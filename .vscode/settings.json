@@ -2,7 +2,8 @@
     "files.associations": {
         "math.h": "c",
         "gl_calls.h": "c",
-        "soil.h": "c"
+        "soil.h": "c",
+        "stb_image.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

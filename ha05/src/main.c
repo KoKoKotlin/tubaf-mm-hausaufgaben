@@ -41,6 +41,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	user_data_t* user_data = glfwGetWindowUserPointer(window);
     if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) user_data->delta_time -= DELTA_TIME_INCREMENT;
     else if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) user_data->delta_time += DELTA_TIME_INCREMENT;
+	else if (key == GLFW_KEY_K && action == GLFW_PRESS) user_data->suprise = 1;
 }
 
 int main(int argc, char *argv[])

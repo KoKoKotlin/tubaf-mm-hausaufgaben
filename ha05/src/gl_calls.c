@@ -1,5 +1,6 @@
 #include "gl_calls.h"
 #include "SOIL/SOIL.h"
+#include "stb_image.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -217,7 +218,8 @@ static void init_vertex_data(user_data_t* user_data, int number_of_edges)
 	vertex_data_t *vertex_data = (vertex_data_t*)malloc(sizeof(vertex_data_t) * (number_of_edges + 2));
 	vertex_data_t vertex = {
 						.position = { 0, 0, 0 },
-						.color = { 0xFF, 0xFF, 0xFF }
+						.color = { 0xFF, 0xFF, 0xFF },
+						.texCoords = { 0.5f, 0.5f },
 					};
 	vertex_data[0] = vertex;
 	for (int i = 0; i < number_of_edges + 1; i++) {
@@ -248,7 +250,8 @@ static void init_vertex_data(user_data_t* user_data, int number_of_edges)
 
 		vertex_data_t vertex = {
 						.position = {rotated_x, rotated_y, 0},
-						.color = { (int)(r * 255.0f), (int)(g * 255.0f), (int)(b * 255.0f) }
+						.color = { (int)(r * 255.0f), (int)(g * 255.0f), (int)(b * 255.0f) },
+						.texCoords = { (rotated_x + 1.0f) / 2.0f, 1 - (rotated_y + 1.0f) / 2.0f },
 					};
 		vertex_data[i + 1] = vertex;
 	}
@@ -286,6 +289,10 @@ static void init_vertex_data(user_data_t* user_data, int number_of_edges)
 	glVertexAttribPointer(ATTRIB_COLOR, 3, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(vertex_data_t), (GLvoid*)offsetof(vertex_data_t, color));
 	gl_check_error("glVertexAttribPointer(ATTRIB_COLOR)");
 
+	// TexCoords attribute:
+	glVertexAttribPointer(ATTRIB_TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_data_t), (GLvoid*)offsetof(vertex_data_t, texCoords));
+	gl_check_error("glVertexAttribPointer(ATTRIB_TEXCOORDS)");
+
 	// Enable the attributes:
 	glEnableVertexAttribArray(ATTRIB_POSITION);
 	gl_check_error("glEnableVertexAttribArray(ATTRIB_POSITION)");
@@ -293,27 +300,48 @@ static void init_vertex_data(user_data_t* user_data, int number_of_edges)
 	glEnableVertexAttribArray(ATTRIB_COLOR);
 	gl_check_error("glEnableVertexAttribArray(ATTRIB_COLOR)");
 
+	glEnableVertexAttribArray(ATTRIB_TEXCOORD);
+	gl_check_error("glEnableVertexAttribArray(ATTRIB_TEXCOORD)");
+
 	// Store vbo handle inside our user data:
 	user_data->vbo = vbo;
 	user_data->delta_time = 0.01f;
+	user_data->suprise = 0;
 	free(vertex_data);
 }
 
 // kf == Kalman filter
 // sudo apt-get install libsoil-dev
 static void load_kf(user_data_t* user_data) {
-	GLuint tex;
-	glGenTextures(1, &tex);
+	// load test image as texture
+    int texture_width = 0;
+    int texture_height = 0;
+    int bits_per_pixel = 0;
 
-	glBindTexture(GL_TEXTURE_2D, tex);
+	stbi_uc *texture_buffer = stbi_load("img.jpg", &texture_width, &texture_height, &bits_per_pixel, 4);
 
-	int width, height;
-	unsigned char* image =
-    SOIL_load_image("img.png", &width, &height, 0, SOIL_LOAD_RGB);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
-              GL_UNSIGNED_BYTE, image);
+    // load the texture to the graphics card
+    GLuint texture_id;
+    glGenTextures(1, &texture_id);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
 
-	SOIL_free_image_data(image);
+    // linear scaling of textures if the player is very near or very far away
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_buffer);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+	int tex_uniform_loc = glGetUniformLocation(user_data->shader_program, "tex");
+	glUniform1i(tex_uniform_loc, 0); // set texture to texture slot 0
+
+    if(texture_buffer != NULL) {
+        stbi_image_free(texture_buffer);
+	}
+
+	user_data->tex = texture_id;
 }
 
 void init_gl(GLFWwindow* window, int number_of_edges)
@@ -325,6 +353,7 @@ void init_gl(GLFWwindow* window, int number_of_edges)
 
 	// Init our vertex data:
 	init_vertex_data(user_data, number_of_edges);
+	load_kf(user_data);
 
 	// Obtain the internal size of the framebuffer
 	int fb_width, fb_height;
@@ -352,6 +381,11 @@ void draw_gl(GLFWwindow* window, int number_of_edges)
 	}
 
 	user_data->timer += user_data->delta_time;
+
+	if (user_data->suprise) {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, user_data->tex);
+	}
 
 	// Finally drawing some stuff!
 	glDrawArrays(GL_TRIANGLE_FAN, 0, (number_of_edges + 2));
