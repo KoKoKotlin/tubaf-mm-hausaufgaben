@@ -11,3 +11,4 @@ Hausaufgaben der MM-Vorlesung von <strong>Christoph Pooch</strong>, <strong>Yann
 - [Hausaufgabe 3](https://github.com/KoKoKotlin/tubaf-mm-hausaufgaben/tree/main/ha03)
 - [Hausaufgabe 4](https://github.com/KoKoKotlin/tubaf-mm-hausaufgaben/tree/main/ha04/01)
     - [Bonus](https://github.com/KoKoKotlin/tubaf-mm-hausaufgaben/tree/main/ha04/02)
+- [Hausaufgabe 5](https://github.com/KoKoKotlin/tubaf-mm-hausaufgaben/tree/main/ha05/src)
