@@ -36,11 +36,14 @@ void window_size_callback(GLFWwindow* window, int width, int height)
 	//printf("WindowSize: %dx%d\n", width, height);
 }
 
+// eventhandler for the keyboard
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	user_data_t* user_data = glfwGetWindowUserPointer(window);
-    if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) user_data->delta_time -= DELTA_TIME_INCREMENT;
+    // change the rotation speed when left or right arrow is pressed
+	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) user_data->delta_time -= DELTA_TIME_INCREMENT;
     else if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) user_data->delta_time += DELTA_TIME_INCREMENT;
+	// activate the SURPRISE when k is pressed
 	else if (key == GLFW_KEY_K && action == GLFW_PRESS) user_data->suprise = 1;
 }
 
@@ -51,6 +54,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	// number of corners
 	int n = atoi(argv[1]);
 
 	if (n < 3) {

@@ -156,7 +156,7 @@ static void init_shader_program(user_data_t* user_data)
 	glDeleteShader(fragment_shader);
 	gl_check_error("glDeleteShader(fragment_shader)");
 
-		// Check the compile status:
+	// Check the compile status:
 	GLint success;
 
 	glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
@@ -215,21 +215,28 @@ static void init_vertex_data(user_data_t* user_data, int number_of_edges)
 		glUniform1f(loc, 0.0);
 	}
 
+	// get memory for the vertex data
 	vertex_data_t *vertex_data = (vertex_data_t*)malloc(sizeof(vertex_data_t) * (number_of_edges + 2));
+
+	// init the first vertex, that points straight up
 	vertex_data_t vertex = {
 						.position = { 0, 0, 0 },
 						.color = { 0xFF, 0xFF, 0xFF },
 						.texCoords = { 0.5f, 0.5f },
 					};
 	vertex_data[0] = vertex;
+
 	for (int i = 0; i < number_of_edges + 1; i++) {
+
 		float angle = 2 * M_PI / number_of_edges * i;
 		float x = 0;
 		float y = 1;
 
+		// generate next vertecies with polar coordinates depending on the angle
 		float rotated_x = x * cosf(angle) - y * sinf(angle);
 		float rotated_y = x * sinf(angle) + y * cosf(angle);
 
+		// calculate the hsv color for the current vertex
 		int h_i = (int)((2 * M_PI - angle) / 1.0472f);
 		float f = (2 * M_PI - angle) / 1.0472f - h_i;
 
@@ -248,6 +255,7 @@ static void init_vertex_data(user_data_t* user_data, int number_of_edges)
 			case 5: r = 1; g = p; b = q; break;
 		}
 
+		// generate the next vertex depending with angle and color
 		vertex_data_t vertex = {
 						.position = {rotated_x, rotated_y, 0},
 						.color = { (int)(r * 255.0f), (int)(g * 255.0f), (int)(b * 255.0f) },
@@ -305,6 +313,8 @@ static void init_vertex_data(user_data_t* user_data, int number_of_edges)
 
 	// Store vbo handle inside our user data:
 	user_data->vbo = vbo;
+
+	// init other user data
 	user_data->delta_time = 0.01f;
 	user_data->suprise = 0;
 	free(vertex_data);
@@ -331,9 +341,11 @@ static void load_kf(user_data_t* user_data) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+	// set texture params
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_buffer);
     glBindTexture(GL_TEXTURE_2D, 0);
 
+	// set the uniform texture location
 	int tex_uniform_loc = glGetUniformLocation(user_data->shader_program, "tex");
 	glUniform1i(tex_uniform_loc, 0); // set texture to texture slot 0
 
@@ -341,6 +353,7 @@ static void load_kf(user_data_t* user_data) {
         stbi_image_free(texture_buffer);
 	}
 
+	// store texture pointer in user data
 	user_data->tex = texture_id;
 }
 
@@ -375,13 +388,17 @@ void draw_gl(GLFWwindow* window, int number_of_edges)
 	gl_check_error("glClear");
 
 	user_data_t* user_data = glfwGetWindowUserPointer(window);
+
+	// set the current time in the shaders
 	GLint loc = glGetUniformLocation(user_data->shader_program, "time");
 	if (loc != -1) {
 		glUniform1f(loc, user_data->timer);
 	}
 
+	// advance the time for rotation
 	user_data->timer += user_data->delta_time;
 
+	// activate the texture for the surprise
 	if (user_data->suprise) {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, user_data->tex);
