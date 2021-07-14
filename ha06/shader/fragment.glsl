@@ -9,6 +9,8 @@ in vec3 f_normal;
 out vec4 out_color;
 
 uniform sampler2D tex;
+uniform sampler2D tex2;
+uniform float tex_inter;
 
 void main()
 {
@@ -36,5 +38,5 @@ void main()
     vec3 i_spec = vec3(1.0) * pow(max(dot(reflect_dir, view_dir), 0.0), 32);
 
     // Combine everything:
-    out_color = texture(tex, f_tex_coords) * f_color * vec4(i_amb + i_diff + i_spec, 1.0);
+    out_color = mix(texture(tex, f_tex_coords), texture(tex2, f_tex_coords), tex_inter) * f_color * vec4(i_amb + i_diff + i_spec, 1.0);
 }

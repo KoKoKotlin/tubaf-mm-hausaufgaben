@@ -8,7 +8,8 @@
 #include "obj.h"
 
 #define MODEL_PATH "models/teapot"
-#define TEX_PATH "models/logo.bmp"
+#define TEX_PATH   "models/logo.bmp"
+#define TEX_PATH2  "models/drachne.bmp"
 #define Y_ANGULAR_VELOCITY 2
 
 static char* read_shader_source_from_file(const char* path)
@@ -197,6 +198,7 @@ static void init_texture(user_data_t* user_data)
 
     // Generate a new texture object:
     GLuint tex;
+    GLuint tex2;
 
     glGenTextures(1, &tex);
     gl_check_error("glGenTextures");
@@ -230,9 +232,43 @@ static void init_texture(user_data_t* user_data)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)width, (GLsizei)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     gl_check_error("glTexImage2D");
 
-    // Free the pixels and store the texture handle:
+    glGenTextures(1, &tex2);
+    gl_check_error("glGenTextures");
+
     free(pixels);
-    user_data->tex = tex;
+
+    glActiveTexture(GL_TEXTURE1);
+
+    // Bind it to the 2D binding point *of texture unit 0*:
+    glBindTexture(GL_TEXTURE_2D, tex2);
+    gl_check_error("glBindTexture");
+
+    // Specify wrapping (uv <=> st):
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl_check_error("glTexParameteri [wrap_u]");
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    gl_check_error("glTexParameteri [wrap_v]");
+
+    // Specify filtering:
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl_check_error("glTexParameteri [min_filter]");
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gl_check_error("glTexParameteri [mag_filter]");
+
+    err = bitmapReadPixels(TEX_PATH2, (bitmap_pixel_t**)&pixels, &width, &height, BITMAP_COLOR_SPACE_RGB);
+    check_error(err == BITMAP_ERROR_SUCCESS, "Failed to load texture bitmap.");
+
+    // Upload the texture pixels to the GPU:
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)width, (GLsizei)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    gl_check_error("glTexImage2D");
+
+    free(pixels);
+
+    // Free the pixels and store the texture handle:
+    user_data->tex  = tex;
+    user_data->tex2 = tex2;
 }
 
 static void init_uniforms(user_data_t* user_data)
@@ -245,14 +281,21 @@ static void init_uniforms(user_data_t* user_data)
     check_error(user_data->angle_y_loc >= 0, "Failed to obtain uniform location for angle_y.");
 
     // Texture:
-    GLint tex_loc = glGetUniformLocation(user_data->shader_program, "tex");
+    GLint tex_loc =   glGetUniformLocation(user_data->shader_program, "tex");
+    GLint tex_loc2 =  glGetUniformLocation(user_data->shader_program, "tex2");
+    GLint tex_inter = glGetUniformLocation(user_data->shader_program, "tex_inter");
 
     gl_check_error("glGetUniformLocation [tex]");
     check_error(tex_loc >= 0, "Failed to obtain uniform location for tex.");
 
     // Associate the sampler "tex" with texture unit 0:
     glUniform1i(tex_loc, 0);
+    glUniform1i(tex_loc2, 1);
+    glUniform1f(tex_inter, 0.0f);
     gl_check_error("glUniform1i [tex]");
+
+    user_data->tex_inter_loc = tex_inter;
+    user_data->tex_inter = 0.0f;
 }
 
 static void init_vertex_data(user_data_t* user_data)
@@ -471,6 +514,8 @@ void update_gl(GLFWwindow* window)
     double frame_time = glfwGetTime();
     double delta_time = frame_time - user_data->last_frame_time;
 
+    glUniform1f(user_data->tex_inter_loc, user_data->tex_inter);
+
     user_data->last_frame_time = frame_time;
 
     // TODO: Update the angle.
@@ -486,6 +531,8 @@ void update_gl(GLFWwindow* window)
 void draw_gl(GLFWwindow* window)
 {
     user_data_t* user_data = glfwGetWindowUserPointer(window);
+
+
 
     // Clear the color buffer -> background color:
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -516,5 +563,8 @@ void teardown_gl(GLFWwindow* window)
 
     // Delete the texture:
     glDeleteTextures(1, &user_data->tex);
+    gl_check_error("glDeleteTextures");
+
+    glDeleteTextures(1, &user_data->tex2);
     gl_check_error("glDeleteTextures");
 }

@@ -32,6 +32,11 @@ typedef struct
 
     // The texture object:
     GLuint tex;
+    GLuint tex2;
+
+    // For interpolation the textures:
+    GLfloat tex_inter;
+    GLint tex_inter_loc;
 
     // The number of vertices to render:
     int vertex_data_count;
