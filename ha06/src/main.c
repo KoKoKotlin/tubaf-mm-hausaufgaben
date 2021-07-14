@@ -46,12 +46,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         user_data->rotate = ROTATE_NONE;
 
     if (key == GLFW_KEY_UP && action == GLFW_PRESS)
-        user_data->tex_inter -= 0.1f;
+        user_data->tex_inter = 0.05f;
     else if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
-        user_data->tex_inter += 0.1f;
+        user_data->tex_inter = -0.05f;
+    else if ((key == GLFW_KEY_UP || key == GLFW_KEY_DOWN) && action == GLFW_RELEASE)
+        user_data->tex_inter = 0.0f;
 
-    if (user_data->tex_inter < 0.0f) user_data->tex_inter = 0.0f;
-    else if (user_data->tex_inter > 1.0f) user_data->tex_inter = 1.0f;
 }
 
 

@@ -514,7 +514,11 @@ void update_gl(GLFWwindow* window)
     double frame_time = glfwGetTime();
     double delta_time = frame_time - user_data->last_frame_time;
 
-    glUniform1f(user_data->tex_inter_loc, user_data->tex_inter);
+    user_data->tex_inter_val += user_data->tex_inter;
+    if (user_data->tex_inter_val > 1.0f) user_data->tex_inter_val = 1.0f;
+    else if (user_data->tex_inter_val < 0.0f) user_data->tex_inter_val = 0.0f;
+
+    glUniform1f(user_data->tex_inter_loc, user_data->tex_inter_val);
 
     user_data->last_frame_time = frame_time;
 
